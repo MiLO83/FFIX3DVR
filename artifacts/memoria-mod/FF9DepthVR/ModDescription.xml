@@ -1,0 +1,10 @@
+<Mod>
+    <Name>FF9 Depth VR</Name>
+    <Version>0.1.0</Version>
+    <Author>rxcam + Codex</Author>
+    <InstallationPath>FF9DepthVR</InstallationPath>
+    <Category>Graphics</Category>
+    <Description>Prototype depth-reconstructed field backgrounds for Final Fantasy IX. Uses all extracted original source plates plus Depth Anything maps and a Memoria runtime renderer; vanilla fields remain the fallback if an asset is missing.</Description>
+    <ReleaseDate>2026-05-28</ReleaseDate>
+    <FullSize>691216510</FullSize>
+</Mod>

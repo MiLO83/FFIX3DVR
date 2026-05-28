@@ -1,0 +1,17 @@
+{
+  "fbg_n00_tshp_map001_th_cgr_0": {
+    "contrast": 1.02,
+    "url": "/assets/maps/fbg_n00_tshp_map001_th_cgr_0/field_erp_tuned.png",
+    "artifactPath": "artifacts/all-fields/erp_tuned/fbg_n00_tshp_map001_th_cgr_0/field_erp.png",
+    "savedAt": "2026-05-27T08:09:19.612Z"
+  },
+  "fbg_n00_tshp_map007_th_orc_0": {
+    "contrast": 1,
+    "brightness": 1.35,
+    "saturation": 0.26,
+    "match": 1,
+    "url": "/assets/maps/fbg_n00_tshp_map007_th_orc_0/field_erp_tuned.png",
+    "artifactPath": "artifacts/all-fields/erp_tuned/fbg_n00_tshp_map007_th_orc_0/field_erp.png",
+    "savedAt": "2026-05-27T08:21:08.547Z"
+  }
+}

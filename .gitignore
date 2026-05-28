@@ -1,0 +1,26 @@
+.external/
+.venv*/
+.venv-tools/
+__pycache__/
+viewer/node_modules/
+viewer/dist/
+viewer/.logs/
+dist/
+*.zip
+*.7z
+
+# Do not commit/share original or color-derived FFIX background assets.
+artifacts/**/source/
+artifacts/**/debug/
+artifacts/**/erp/
+artifacts/**/erp_*/
+artifacts/**/splat/
+artifacts/**/splat_*/
+artifacts/**/source_plate*.png
+artifacts/**/field_erp*.png
+artifacts/**/*.ply
+viewer/public/assets/originals/
+viewer/public/assets/maps/
+viewer/public/assets/**/source_plate*.png
+viewer/public/assets/**/field_erp*.png
+viewer/public/assets/**/*.ply
