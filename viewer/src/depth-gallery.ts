@@ -84,16 +84,21 @@ root.innerHTML = `
       </div>
       <div class="focus-dot" id="focus-dot"></div>
       <aside class="control-panel">
-        <label class="readout-row">
-          <span>Mouse Z</span>
-          <output id="focus-value">0.50</output>
-        </label>
-        <button id="reset-btn" type="button">Reset View</button>
-        <button id="view-mode-btn" type="button">View 2D</button>
-        <button id="floor-mode-btn" type="button">Floor Active</button>
-        <button id="depth-surface-btn" type="button">Cast Ground</button>
-        <small id="depth-status">Depth: checking</small>
-        <small id="walkmesh-status">Walkmesh: depth</small>
+        <div class="control-buttons">
+          <label class="readout-row">
+            <span>Mouse Z</span>
+            <output id="focus-value">0.50</output>
+          </label>
+          <button id="reset-btn" type="button">Reset View</button>
+          <button id="view-mode-btn" type="button">View 2D</button>
+          <button id="floor-mode-btn" type="button">Floor Active</button>
+          <button id="depth-surface-btn" type="button">Cast Ground</button>
+          <button id="walkmesh-visible-btn" type="button" aria-pressed="false">Show Walkmesh</button>
+        </div>
+        <div class="status-row">
+          <small id="depth-status">Depth: checking</small>
+          <small id="walkmesh-status">Walkmesh: hidden</small>
+        </div>
       </aside>
     </section>
     <nav class="thumb-rail" id="thumb-rail" aria-label="Final Fantasy IX backgrounds"></nav>
@@ -208,10 +213,10 @@ style.textContent = `
     left: 50%;
     bottom: 16px;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: min(720px, calc(100vw - 32px));
+    width: min(980px, calc(100vw - 32px));
     gap: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -219,6 +224,28 @@ style.textContent = `
     padding: 10px;
     transform: translateX(-50%);
     backdrop-filter: blur(14px);
+  }
+
+  .control-buttons,
+  .status-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .control-buttons > * {
+    flex: 0 0 auto;
+  }
+
+  .control-panel button {
+    white-space: nowrap;
+  }
+
+  .status-row {
+    gap: 14px;
   }
 
   .control-panel label {
@@ -302,6 +329,8 @@ style.textContent = `
     .depth-page { grid-template-rows: minmax(0, 1fr) 96px; }
     .topbar { align-items: flex-start; flex-direction: column; }
     .control-panel { left: 10px; right: 10px; bottom: 10px; width: auto; transform: none; }
+    .control-buttons { flex-wrap: wrap; }
+    .status-row { flex-wrap: wrap; }
     .control-panel label { grid-template-columns: minmax(0, 1fr) 48px; }
     .thumb { flex-basis: 128px; }
   }
@@ -316,6 +345,7 @@ const depthStatus = root.querySelector<HTMLElement>("#depth-status")!;
 const walkmeshStatus = root.querySelector<HTMLElement>("#walkmesh-status")!;
 const xrButton = root.querySelector<HTMLButtonElement>("#xr-btn")!;
 const viewModeButton = root.querySelector<HTMLButtonElement>("#view-mode-btn")!;
+const walkmeshVisibleButton = root.querySelector<HTMLButtonElement>("#walkmesh-visible-btn")!;
 const floorModeButton = root.querySelector<HTMLButtonElement>("#floor-mode-btn")!;
 const depthSurfaceButton = root.querySelector<HTMLButtonElement>("#depth-surface-btn")!;
 const focusOutput = root.querySelector<HTMLOutputElement>("#focus-value")!;
@@ -338,6 +368,7 @@ let rackTargetDepth = 0.5;
 let rackStartDepth = 0.5;
 let rackElapsedSeconds = 99;
 let walkmeshMode: WalkmeshMode = "depth";
+let walkmeshVisible = false;
 let viewMode: ViewMode = "depth3d";
 let walkmeshFloorMode: WalkmeshFloorMode = "active";
 let depthSurfaceMode: DepthSurfaceMode = "farthest";
@@ -970,6 +1001,12 @@ function setViewModeButtonState() {
   viewModeButton.classList.toggle("active", viewMode === "flat2d");
 }
 
+function setWalkmeshVisibleButtonState() {
+  walkmeshVisibleButton.textContent = walkmeshVisible ? "Hide Walkmesh" : "Show Walkmesh";
+  walkmeshVisibleButton.setAttribute("aria-pressed", String(walkmeshVisible));
+  walkmeshVisibleButton.classList.toggle("active", walkmeshVisible);
+}
+
 function setFloorModeButtonState() {
   floorModeButton.textContent =
     walkmeshFloorMode === "active" ? "Floor Active" : walkmeshFloorMode === "all" ? "Floor All" : `Floor ${walkmeshFloorMode}`;
@@ -1012,6 +1049,12 @@ async function syncWalkmeshOverlay(background: GalleryBackground) {
   }
   setFloorModeButtonState();
   setDepthSurfaceButtonState();
+  setWalkmeshVisibleButtonState();
+
+  if (!walkmeshVisible) {
+    walkmeshStatus.textContent = "Walkmesh: hidden";
+    return;
+  }
 
   walkmeshStatus.textContent = "Walkmesh: loading";
   try {
@@ -1099,6 +1142,7 @@ async function showScene(index: number) {
   window.history.replaceState(null, "", `#/scene/${background.generatedAssetId ?? background.id}`);
   title.textContent = background.mapName;
   setViewModeButtonState();
+  setWalkmeshVisibleButtonState();
   setFloorModeButtonState();
   setDepthSurfaceButtonState();
   depthStatus.textContent = "Depth: loading";
@@ -1179,6 +1223,11 @@ viewModeButton.addEventListener("click", () => {
   setViewModeButtonState();
   void showScene(activeIndex);
 });
+walkmeshVisibleButton.addEventListener("click", () => {
+  walkmeshVisible = !walkmeshVisible;
+  setWalkmeshVisibleButtonState();
+  void syncWalkmeshOverlay(backgrounds[activeIndex]);
+});
 floorModeButton.addEventListener("click", () => {
   cycleWalkmeshFloorMode();
   setFloorModeButtonState();
@@ -1235,15 +1284,17 @@ state.renderer.setAnimationLoop(() => {
   const wiggle = LOCKED_WIGGLE;
   const mesh = state.mesh;
   if (mesh) {
-    const autoWiggle = Math.sin(t * 0.9) * 0.035 * wiggle;
+    const autoWiggleX = Math.sin(t * 0.9) * 0.035 * wiggle;
+    const autoWiggleY = Math.cos(t * 0.73 + 0.8) * 0.018 * wiggle;
+    const autoWiggleZ = Math.sin(t * 0.57 + 1.35) * 0.12 * wiggle;
     if (viewMode === "flat2d") {
       mesh.rotation.x += (0 - mesh.rotation.x) * 0.2;
       mesh.rotation.y += (0 - mesh.rotation.y) * 0.2;
     } else {
-      mesh.rotation.y += (targetYaw * wiggle * TILT_MULTIPLIER + autoWiggle - mesh.rotation.y) * 0.075;
-      mesh.rotation.x += (targetPitch * wiggle * TILT_MULTIPLIER - mesh.rotation.x) * 0.075;
+      mesh.rotation.y += (targetYaw * wiggle * TILT_MULTIPLIER + autoWiggleX - mesh.rotation.y) * 0.075;
+      mesh.rotation.x += (targetPitch * wiggle * TILT_MULTIPLIER + autoWiggleY - mesh.rotation.x) * 0.075;
     }
-    state.camera.position.set(0, 0, BASE_CAMERA_Z);
+    state.camera.position.set(0, 0, BASE_CAMERA_Z + (viewMode === "flat2d" ? 0 : autoWiggleZ));
     state.camera.lookAt(0, 0, 0);
     const targetDepth = syncFocusFromPointer(mesh);
     const focusDepth = updateAutofocus(targetDepth, deltaSeconds, t);
