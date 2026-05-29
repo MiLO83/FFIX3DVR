@@ -39,9 +39,8 @@ type CameraData = {
   activeOverlayCameras?: number[];
 };
 
-type WalkmeshMode = "off" | "flat" | "depth";
+type WalkmeshMode = "depth";
 type ViewMode = "depth3d" | "flat2d";
-type ProjectionYMode = "screen" | "flipped";
 type WalkmeshFloorMode = "active" | "all" | number;
 type DepthSurfaceMode = "ground" | "nearest" | "farthest";
 
@@ -91,12 +90,10 @@ root.innerHTML = `
         </label>
         <button id="reset-btn" type="button">Reset View</button>
         <button id="view-mode-btn" type="button">View 2D</button>
-        <button id="projection-y-btn" type="button">Mesh Y Screen</button>
         <button id="floor-mode-btn" type="button">Floor Active</button>
         <button id="depth-surface-btn" type="button">Cast Ground</button>
-        <button id="walkmesh-btn" type="button">Walkmesh Off</button>
         <small id="depth-status">Depth: checking</small>
-        <small id="walkmesh-status">Walkmesh: off</small>
+        <small id="walkmesh-status">Walkmesh: depth</small>
       </aside>
     </section>
     <nav class="thumb-rail" id="thumb-rail" aria-label="Final Fantasy IX backgrounds"></nav>
@@ -208,15 +205,19 @@ style.textContent = `
   .control-panel {
     position: absolute;
     z-index: 4;
-    right: 16px;
+    left: 50%;
     bottom: 16px;
-    display: grid;
-    width: min(360px, calc(100vw - 32px));
-    gap: 11px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    width: min(720px, calc(100vw - 32px));
+    gap: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(7, 8, 9, 0.78);
-    padding: 14px;
+    padding: 10px;
+    transform: translateX(-50%);
     backdrop-filter: blur(14px);
   }
 
@@ -225,6 +226,7 @@ style.textContent = `
     grid-template-columns: minmax(0, 1fr) 52px;
     gap: 9px;
     align-items: center;
+    min-width: 132px;
   }
 
   .control-panel span,
@@ -299,7 +301,7 @@ style.textContent = `
   @media (max-width: 780px) {
     .depth-page { grid-template-rows: minmax(0, 1fr) 96px; }
     .topbar { align-items: flex-start; flex-direction: column; }
-    .control-panel { left: 10px; right: 10px; bottom: 10px; width: auto; }
+    .control-panel { left: 10px; right: 10px; bottom: 10px; width: auto; transform: none; }
     .control-panel label { grid-template-columns: minmax(0, 1fr) 48px; }
     .thumb { flex-basis: 128px; }
   }
@@ -313,9 +315,7 @@ const focusDot = root.querySelector<HTMLElement>("#focus-dot")!;
 const depthStatus = root.querySelector<HTMLElement>("#depth-status")!;
 const walkmeshStatus = root.querySelector<HTMLElement>("#walkmesh-status")!;
 const xrButton = root.querySelector<HTMLButtonElement>("#xr-btn")!;
-const walkmeshButton = root.querySelector<HTMLButtonElement>("#walkmesh-btn")!;
 const viewModeButton = root.querySelector<HTMLButtonElement>("#view-mode-btn")!;
-const projectionYButton = root.querySelector<HTMLButtonElement>("#projection-y-btn")!;
 const floorModeButton = root.querySelector<HTMLButtonElement>("#floor-mode-btn")!;
 const depthSurfaceButton = root.querySelector<HTMLButtonElement>("#depth-surface-btn")!;
 const focusOutput = root.querySelector<HTMLOutputElement>("#focus-value")!;
@@ -337,9 +337,8 @@ let displayedDofAmount = LOCKED_DOF;
 let rackTargetDepth = 0.5;
 let rackStartDepth = 0.5;
 let rackElapsedSeconds = 99;
-let walkmeshMode: WalkmeshMode = "off";
+let walkmeshMode: WalkmeshMode = "depth";
 let viewMode: ViewMode = "depth3d";
-let projectionYMode: ProjectionYMode = "flipped";
 let walkmeshFloorMode: WalkmeshFloorMode = "active";
 let depthSurfaceMode: DepthSurfaceMode = "farthest";
 let availableWalkmeshFloors: number[] = [];
@@ -439,17 +438,17 @@ function makeDepthSampler(source: HTMLImageElement | HTMLCanvasElement) {
 
 function sampleShaderDepth(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>, uv: THREE.Vector2) {
   const sampleDepth = mesh.userData.sampleFocusDepth as ((u: number, v: number) => number) | undefined;
-  return sampleDepth ? sampleDepth(uv.x, projectionYMode === "flipped" ? 1 - uv.y : uv.y) : lastFocusDepth;
+  return sampleDepth ? sampleDepth(uv.x, 1 - uv.y) : lastFocusDepth;
 }
 
 function plateLocalY(uvY: number, baseHeight: number) {
-  const imageY = projectionYMode === "flipped" ? 1 - uvY : uvY;
+  const imageY = 1 - uvY;
   return (imageY - 0.5) * baseHeight;
 }
 
 function plateUvY(localY: number, baseHeight: number) {
   const imageY = localY / baseHeight + 0.5;
-  return projectionYMode === "flipped" ? 1 - imageY : imageY;
+  return 1 - imageY;
 }
 
 function depthPlatePoint(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>, uv: THREE.Vector2, lift = 0.018) {
@@ -966,19 +965,9 @@ function disposeObject3D(object: THREE.Object3D) {
   });
 }
 
-function setWalkmeshButtonState() {
-  walkmeshButton.textContent = walkmeshMode === "off" ? "Walkmesh Off" : walkmeshMode === "flat" ? "Walkmesh Flat" : "Walkmesh Depth";
-  walkmeshButton.classList.toggle("active", walkmeshMode !== "off");
-}
-
 function setViewModeButtonState() {
   viewModeButton.textContent = viewMode === "flat2d" ? "View 3D" : "View 2D";
   viewModeButton.classList.toggle("active", viewMode === "flat2d");
-}
-
-function setProjectionYButtonState() {
-  projectionYButton.textContent = projectionYMode === "screen" ? "Mesh Y Screen" : "Mesh Y Flipped";
-  projectionYButton.classList.toggle("active", projectionYMode === "flipped");
 }
 
 function setFloorModeButtonState() {
@@ -1021,14 +1010,8 @@ async function syncWalkmeshOverlay(background: GalleryBackground) {
     state.mesh.remove(previous);
     disposeObject3D(previous);
   }
-  setWalkmeshButtonState();
-  setProjectionYButtonState();
   setFloorModeButtonState();
   setDepthSurfaceButtonState();
-  if (walkmeshMode === "off") {
-    walkmeshStatus.textContent = "Walkmesh: off";
-    return;
-  }
 
   walkmeshStatus.textContent = "Walkmesh: loading";
   try {
@@ -1116,7 +1099,6 @@ async function showScene(index: number) {
   window.history.replaceState(null, "", `#/scene/${background.generatedAssetId ?? background.id}`);
   title.textContent = background.mapName;
   setViewModeButtonState();
-  setProjectionYButtonState();
   setFloorModeButtonState();
   setDepthSurfaceButtonState();
   depthStatus.textContent = "Depth: loading";
@@ -1192,21 +1174,10 @@ canvas.addEventListener(
 
 root.querySelector("#prev-btn")?.addEventListener("click", () => void showScene(activeIndex - 1));
 root.querySelector("#next-btn")?.addEventListener("click", () => void showScene(activeIndex + 1));
-walkmeshButton.addEventListener("click", () => {
-  walkmeshMode = walkmeshMode === "off" ? "flat" : walkmeshMode === "flat" ? "depth" : "off";
-  void syncWalkmeshOverlay(backgrounds[activeIndex]);
-});
 viewModeButton.addEventListener("click", () => {
   viewMode = viewMode === "depth3d" ? "flat2d" : "depth3d";
-  if (viewMode === "flat2d" && walkmeshMode === "off") walkmeshMode = "flat";
   setViewModeButtonState();
-  setWalkmeshButtonState();
   void showScene(activeIndex);
-});
-projectionYButton.addEventListener("click", () => {
-  projectionYMode = projectionYMode === "screen" ? "flipped" : "screen";
-  setProjectionYButtonState();
-  void syncWalkmeshOverlay(backgrounds[activeIndex]);
 });
 floorModeButton.addEventListener("click", () => {
   cycleWalkmeshFloorMode();
@@ -1216,7 +1187,7 @@ floorModeButton.addEventListener("click", () => {
 depthSurfaceButton.addEventListener("click", () => {
   cycleDepthSurfaceMode();
   setDepthSurfaceButtonState();
-  if (walkmeshMode === "depth") void syncWalkmeshOverlay(backgrounds[activeIndex]);
+  void syncWalkmeshOverlay(backgrounds[activeIndex]);
 });
 root.querySelector("#reset-btn")?.addEventListener("click", () => {
   pointerUv.set(0.5, 0.5);
