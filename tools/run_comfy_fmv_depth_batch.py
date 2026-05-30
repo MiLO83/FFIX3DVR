@@ -130,13 +130,25 @@ def make_prompt(input_name: str, prefix: str, ckpt_name: str, resolution: int) -
     }
 
 
+def cleanup_temp_file(path: Path) -> None:
+    for attempt in range(5):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt == 4:
+                return
+            time.sleep(0.25)
+
+
 def run_depth_frame(frame: Path, depth_path: Path, movie_key: str, ckpt_name: str, resolution: int, force: bool) -> dict:
     if depth_path.exists() and not force:
         return {"ok": True, "skipped": True}
 
     depth_path.parent.mkdir(parents=True, exist_ok=True)
     input_name = f"fmv_depth_{movie_key}_{frame.stem}.png"
-    shutil.copy2(frame, COMFY / "input" / input_name)
+    input_path = COMFY / "input" / input_name
+    shutil.copy2(frame, input_path)
     prefix = f"ffix_fmv_depth_{movie_key}_{frame.stem}"
     prompt = make_prompt(input_name, prefix, ckpt_name, resolution)
     prompt_id = str(uuid.uuid4())
@@ -157,6 +169,8 @@ def run_depth_frame(frame: Path, depth_path: Path, movie_key: str, ckpt_name: st
         image = images[-1]
         comfy_out = COMFY / "output" / image["filename"]
         shutil.copy2(comfy_out, depth_path)
+        cleanup_temp_file(input_path)
+        cleanup_temp_file(comfy_out)
         return {"ok": True, "skipped": False}
     return {"ok": False, "error": "timeout"}
 

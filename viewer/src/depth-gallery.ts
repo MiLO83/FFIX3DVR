@@ -11,6 +11,8 @@ type SceneState = {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  leftCamera: THREE.PerspectiveCamera;
+  rightCamera: THREE.PerspectiveCamera;
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null;
 };
 
@@ -60,48 +62,77 @@ const BASE_CAMERA_Z = 8.2;
 const PLATE_VIEWPORT_FILL = 0.9;
 const LOCKED_WIGGLE = 1.2;
 const LOCKED_DEPTH = 2.5;
-const LOCKED_DOF = 1;
+const LOCKED_DOF = 0;
 const TILT_MULTIPLIER = 2;
 const VIEW_ANGLE_MULTIPLIER = 1;
+const STEREO_IPD = 0.16;
 
-const root = document.querySelector<HTMLDivElement>("#depth-gallery");
-if (!root) throw new Error("Depth gallery root is missing");
+function controlPanelMarkup(kind: "main" | "left" | "right") {
+  const stereoClass = kind === "main" ? "" : ` stereo-panel stereo-${kind}`;
+  const idSuffix = kind === "main" ? "" : `-${kind}`;
+  return `
+      <aside class="control-panel${stereoClass}" aria-label="${kind === "main" ? "Depth controls" : `${kind} eye depth controls`}">
+        <div class="control-buttons">
+          <label class="readout-row">
+            <span>Mouse Z</span>
+            <output class="focus-value" ${kind === "main" ? 'id="focus-value"' : ""}>0.50</output>
+          </label>
+          <button ${kind === "main" ? 'id="reset-btn"' : ""} data-action="reset" type="button">Reset View</button>
+          <button ${kind === "main" ? 'id="view-mode-btn"' : ""} data-control="view-mode" data-action="view-mode" type="button">View 2D</button>
+          <button ${kind === "main" ? 'id="sbs-mode-btn"' : ""} data-control="sbs-mode" data-action="sbs-mode" type="button" aria-pressed="false">SBS 3D</button>
+          <button ${kind === "main" ? 'id="floor-mode-btn"' : ""} data-control="floor-mode" data-action="floor-mode" type="button">Floor Active</button>
+          <button ${kind === "main" ? 'id="depth-surface-btn"' : ""} data-control="depth-surface" data-action="depth-surface" type="button">Cast Ground</button>
+          <button ${kind === "main" ? 'id="walkmesh-visible-btn"' : ""} data-control="walkmesh-visible" data-action="walkmesh-visible" type="button" aria-pressed="false">Show Walkmesh</button>
+        </div>
+        <div class="status-row">
+          <small class="depth-status" ${kind === "main" ? 'id="depth-status"' : ""}>Depth: checking</small>
+          <small class="walkmesh-status" ${kind === "main" ? 'id="walkmesh-status"' : ""}>Walkmesh: hidden</small>
+        </div>
+      </aside>`;
+}
+
+function topbarMarkup(kind: "main" | "left" | "right") {
+  const stereoClass = kind === "main" ? "" : ` stereo-topbar stereo-${kind}`;
+  return `
+      <div class="topbar${stereoClass}" aria-label="${kind === "main" ? "Scene navigation" : `${kind} eye scene navigation`}">
+        <div>
+          <p>FFIX Depth Gallery</p>
+          <h1 class="scene-title" ${kind === "main" ? 'id="scene-title"' : ""}>Loading backgrounds</h1>
+        </div>
+        <div class="top-actions">
+          <button data-action="prev-scene" type="button" title="Previous background">Prev</button>
+          <button data-action="next-scene" type="button" title="Next background">Next</button>
+          <button class="xr-btn" ${kind === "main" ? 'id="xr-btn"' : ""} data-action="vr" type="button" title="Enter VR">VR</button>
+        </div>
+      </div>`;
+}
+
+function thumbRailMarkup(kind: "main" | "left" | "right") {
+  const stereoClass = kind === "main" ? "" : ` stereo-rail stereo-${kind}`;
+  return `<nav class="thumb-rail${stereoClass}" ${kind === "main" ? 'id="thumb-rail"' : ""} aria-label="${kind === "main" ? "Final Fantasy IX backgrounds" : `${kind} eye Final Fantasy IX backgrounds`}"></nav>`;
+}
+
+const rootElement = document.querySelector<HTMLDivElement>("#depth-gallery");
+if (!rootElement) throw new Error("Depth gallery root is missing");
+const root = rootElement;
 
 root.innerHTML = `
   <main class="depth-page">
     <section class="stage-shell">
       <canvas class="depth-canvas"></canvas>
-      <div class="topbar">
-        <div>
-          <p>FFIX Depth Gallery</p>
-          <h1 id="scene-title">Loading backgrounds</h1>
-        </div>
-        <div class="top-actions">
-          <button id="prev-btn" type="button" title="Previous background">Prev</button>
-          <button id="next-btn" type="button" title="Next background">Next</button>
-          <button id="xr-btn" type="button" title="Enter VR">VR</button>
-        </div>
-      </div>
+      ${topbarMarkup("main")}
+      ${topbarMarkup("left")}
+      ${topbarMarkup("right")}
       <div class="focus-dot" id="focus-dot"></div>
-      <aside class="control-panel">
-        <div class="control-buttons">
-          <label class="readout-row">
-            <span>Mouse Z</span>
-            <output id="focus-value">0.50</output>
-          </label>
-          <button id="reset-btn" type="button">Reset View</button>
-          <button id="view-mode-btn" type="button">View 2D</button>
-          <button id="floor-mode-btn" type="button">Floor Active</button>
-          <button id="depth-surface-btn" type="button">Cast Ground</button>
-          <button id="walkmesh-visible-btn" type="button" aria-pressed="false">Show Walkmesh</button>
-        </div>
-        <div class="status-row">
-          <small id="depth-status">Depth: checking</small>
-          <small id="walkmesh-status">Walkmesh: hidden</small>
-        </div>
-      </aside>
+      ${controlPanelMarkup("main")}
+      ${controlPanelMarkup("left")}
+      ${controlPanelMarkup("right")}
     </section>
-    <nav class="thumb-rail" id="thumb-rail" aria-label="Final Fantasy IX backgrounds"></nav>
+    ${thumbRailMarkup("main")}
+    <div class="stereo-rails">
+      ${thumbRailMarkup("left")}
+      ${thumbRailMarkup("right")}
+    </div>
   </main>
 `;
 
@@ -156,6 +187,29 @@ style.textContent = `
     padding: 18px 20px;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
     pointer-events: none;
+  }
+
+  .stereo-topbar {
+    display: none;
+  }
+
+  .sbs-mode .topbar:not(.stereo-topbar) {
+    display: none;
+  }
+
+  .sbs-mode .stereo-topbar {
+    display: flex;
+    width: 50vw;
+    right: auto;
+    padding: 16px 18px;
+  }
+
+  .sbs-mode .stereo-topbar.stereo-left {
+    left: 0;
+  }
+
+  .sbs-mode .stereo-topbar.stereo-right {
+    left: 50%;
   }
 
   .topbar p {
@@ -226,6 +280,11 @@ style.textContent = `
     backdrop-filter: blur(14px);
   }
 
+  .sbs-mode .top-actions button {
+    min-height: 36px;
+    padding: 0 11px;
+  }
+
   .control-buttons,
   .status-row {
     display: flex;
@@ -246,6 +305,49 @@ style.textContent = `
 
   .status-row {
     gap: 14px;
+  }
+
+  .stereo-panel {
+    display: none;
+  }
+
+  .sbs-mode .control-panel:not(.stereo-panel) {
+    display: none;
+  }
+
+  .sbs-mode .stereo-panel {
+    display: flex;
+    width: calc(50vw - 20px);
+    padding: 8px;
+  }
+
+  .sbs-mode .stereo-left {
+    left: 25%;
+  }
+
+  .sbs-mode .stereo-right {
+    left: 75%;
+  }
+
+  .sbs-mode .control-buttons {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .sbs-mode .control-panel button {
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 0.76rem;
+  }
+
+  .sbs-mode .control-panel label {
+    min-width: 86px;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    gap: 5px;
+  }
+
+  .sbs-mode .status-row {
+    gap: 8px;
   }
 
   .control-panel label {
@@ -328,27 +430,69 @@ style.textContent = `
   @media (max-width: 780px) {
     .depth-page { grid-template-rows: minmax(0, 1fr) 96px; }
     .topbar { align-items: flex-start; flex-direction: column; }
+    .sbs-mode .stereo-topbar { padding: 12px 10px; }
     .control-panel { left: 10px; right: 10px; bottom: 10px; width: auto; transform: none; }
+    .sbs-mode .stereo-panel { width: calc(50vw - 14px); right: auto; transform: translateX(-50%); }
     .control-buttons { flex-wrap: wrap; }
     .status-row { flex-wrap: wrap; }
     .control-panel label { grid-template-columns: minmax(0, 1fr) 48px; }
     .thumb { flex-basis: 128px; }
   }
+
+  .stereo-rails {
+    display: none;
+  }
+
+  .sbs-mode .depth-page {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr) 96px;
+  }
+
+  .sbs-mode .stage-shell {
+    grid-column: 1 / 3;
+  }
+
+  .sbs-mode > .depth-page > .thumb-rail:not(.stereo-rail) {
+    display: none;
+  }
+
+  .sbs-mode .stereo-rails {
+    display: grid;
+    grid-column: 1 / 3;
+    grid-template-columns: 1fr 1fr;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .sbs-mode .stereo-rail {
+    min-width: 0;
+  }
+
+  .sbs-mode .thumb {
+    flex-basis: 152px !important;
+    grid-template-rows: 68px auto !important;
+    gap: 7px !important;
+    width: 152px !important;
+    margin-right: -76px;
+    padding: 7px !important;
+    transform: scale(0.5);
+    transform-origin: left top;
+  }
+
+  .sbs-mode .thumb img {
+    height: 68px !important;
+    border-radius: 6px !important;
+  }
+
+  .sbs-mode .thumb strong {
+    font-size: 0.7rem !important;
+  }
 `;
 document.head.appendChild(style);
 
 const canvas = root.querySelector<HTMLCanvasElement>(".depth-canvas")!;
-const title = root.querySelector<HTMLHeadingElement>("#scene-title")!;
-const rail = root.querySelector<HTMLElement>("#thumb-rail")!;
 const focusDot = root.querySelector<HTMLElement>("#focus-dot")!;
-const depthStatus = root.querySelector<HTMLElement>("#depth-status")!;
-const walkmeshStatus = root.querySelector<HTMLElement>("#walkmesh-status")!;
-const xrButton = root.querySelector<HTMLButtonElement>("#xr-btn")!;
-const viewModeButton = root.querySelector<HTMLButtonElement>("#view-mode-btn")!;
-const walkmeshVisibleButton = root.querySelector<HTMLButtonElement>("#walkmesh-visible-btn")!;
-const floorModeButton = root.querySelector<HTMLButtonElement>("#floor-mode-btn")!;
-const depthSurfaceButton = root.querySelector<HTMLButtonElement>("#depth-surface-btn")!;
-const focusOutput = root.querySelector<HTMLOutputElement>("#focus-value")!;
+const xrButtons = root.querySelectorAll<HTMLButtonElement>(".xr-btn")!;
 
 let backgrounds: GalleryBackground[] = [];
 let activeIndex = 0;
@@ -369,11 +513,37 @@ let rackStartDepth = 0.5;
 let rackElapsedSeconds = 99;
 let walkmeshMode: WalkmeshMode = "depth";
 let walkmeshVisible = false;
+let sbsMode = false;
 let viewMode: ViewMode = "depth3d";
 let walkmeshFloorMode: WalkmeshFloorMode = "active";
 let depthSurfaceMode: DepthSurfaceMode = "farthest";
 let availableWalkmeshFloors: number[] = [];
 const movementKeys = new Set<string>();
+
+function setText(selector: string, text: string) {
+  root.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+    element.textContent = text;
+  });
+}
+
+function setSceneTitle(text: string) {
+  root.querySelectorAll<HTMLHeadingElement>(".scene-title").forEach((heading) => {
+    heading.textContent = text;
+  });
+}
+
+function setVrButtonState(text: string, disabled: boolean) {
+  xrButtons.forEach((button) => {
+    button.textContent = text;
+    button.disabled = disabled;
+  });
+}
+
+function setFocusOutput(value: number) {
+  root.querySelectorAll<HTMLOutputElement>(".focus-value").forEach((output) => {
+    output.value = value.toFixed(2);
+  });
+}
 
 function fitMeshToViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>, camera: THREE.PerspectiveCamera) {
   const baseWidth = Number(mesh.userData.baseWidth) || 1;
@@ -384,6 +554,11 @@ function fitMeshToViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMat
   const maxHeight = visibleHeight * PLATE_VIEWPORT_FILL;
   const scale = Math.min(maxWidth / baseWidth, maxHeight / baseHeight);
   mesh.scale.set(scale, scale, 1);
+}
+
+function fitDepthMeshToCurrentViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>) {
+  fitMeshToViewport(mesh, state.camera);
+  if (sbsMode) mesh.scale.x *= 0.5;
 }
 
 function toBackgrounds(manifest: AssetManifest): GalleryBackground[] {
@@ -713,7 +888,7 @@ function syncFocusFromPointer(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.Shader
     autofocusVelocity = -Math.sign(travel || 1) * Math.min(0.42, 0.1 + Math.abs(travel) * 1.8);
   }
   targetFocusDepth = lastFocusDepth;
-  focusOutput.value = lastFocusDepth.toFixed(2);
+  setFocusOutput(lastFocusDepth);
   return targetFocusDepth;
 }
 
@@ -997,26 +1172,43 @@ function disposeObject3D(object: THREE.Object3D) {
 }
 
 function setViewModeButtonState() {
-  viewModeButton.textContent = viewMode === "flat2d" ? "View 3D" : "View 2D";
-  viewModeButton.classList.toggle("active", viewMode === "flat2d");
+  root.querySelectorAll<HTMLButtonElement>('[data-control="view-mode"]').forEach((button) => {
+    button.textContent = viewMode === "flat2d" ? "View 3D" : "View 2D";
+    button.classList.toggle("active", viewMode === "flat2d");
+  });
+}
+
+function setSbsModeButtonState() {
+  root.classList.toggle("sbs-mode", sbsMode);
+  root.querySelectorAll<HTMLButtonElement>('[data-control="sbs-mode"]').forEach((button) => {
+    button.textContent = sbsMode ? "SBS On" : "SBS 3D";
+    button.setAttribute("aria-pressed", String(sbsMode));
+    button.classList.toggle("active", sbsMode);
+  });
 }
 
 function setWalkmeshVisibleButtonState() {
-  walkmeshVisibleButton.textContent = walkmeshVisible ? "Hide Walkmesh" : "Show Walkmesh";
-  walkmeshVisibleButton.setAttribute("aria-pressed", String(walkmeshVisible));
-  walkmeshVisibleButton.classList.toggle("active", walkmeshVisible);
+  root.querySelectorAll<HTMLButtonElement>('[data-control="walkmesh-visible"]').forEach((button) => {
+    button.textContent = walkmeshVisible ? "Hide Walkmesh" : "Show Walkmesh";
+    button.setAttribute("aria-pressed", String(walkmeshVisible));
+    button.classList.toggle("active", walkmeshVisible);
+  });
 }
 
 function setFloorModeButtonState() {
-  floorModeButton.textContent =
-    walkmeshFloorMode === "active" ? "Floor Active" : walkmeshFloorMode === "all" ? "Floor All" : `Floor ${walkmeshFloorMode}`;
-  floorModeButton.classList.toggle("active", walkmeshFloorMode === "all");
+  root.querySelectorAll<HTMLButtonElement>('[data-control="floor-mode"]').forEach((button) => {
+    button.textContent =
+      walkmeshFloorMode === "active" ? "Floor Active" : walkmeshFloorMode === "all" ? "Floor All" : `Floor ${walkmeshFloorMode}`;
+    button.classList.toggle("active", walkmeshFloorMode === "all");
+  });
 }
 
 function setDepthSurfaceButtonState() {
-  depthSurfaceButton.textContent =
-    depthSurfaceMode === "ground" ? "Cast Ground" : depthSurfaceMode === "nearest" ? "Cast Near" : "Cast Far";
-  depthSurfaceButton.classList.toggle("active", depthSurfaceMode !== "nearest");
+  root.querySelectorAll<HTMLButtonElement>('[data-control="depth-surface"]').forEach((button) => {
+    button.textContent =
+      depthSurfaceMode === "ground" ? "Cast Ground" : depthSurfaceMode === "nearest" ? "Cast Near" : "Cast Far";
+    button.classList.toggle("active", depthSurfaceMode !== "nearest");
+  });
 }
 
 function floorLabelForStatus(mode: WalkmeshFloorMode, activeFloor: number) {
@@ -1052,11 +1244,11 @@ async function syncWalkmeshOverlay(background: GalleryBackground) {
   setWalkmeshVisibleButtonState();
 
   if (!walkmeshVisible) {
-    walkmeshStatus.textContent = "Walkmesh: hidden";
+    setText(".walkmesh-status", "Walkmesh: hidden");
     return;
   }
 
-  walkmeshStatus.textContent = "Walkmesh: loading";
+  setText(".walkmesh-status", "Walkmesh: loading");
   try {
     const mode = walkmeshMode;
     const group = await makeWalkmeshGroup(background, state.mesh, mode, state.camera);
@@ -1064,12 +1256,12 @@ async function syncWalkmeshOverlay(background: GalleryBackground) {
       state.mesh.add(group);
       const floorLabel = floorLabelForStatus(group.userData.floorMode, group.userData.activeFloor);
       const surfaceLabel = mode === "depth" ? `, ${depthSurfaceLabelForStatus(depthSurfaceMode)}` : "";
-      walkmeshStatus.textContent = `Walkmesh: ${mode}, ${floorLabel}${surfaceLabel}, ${group.userData.triangleCount} tris, WASD`;
+      setText(".walkmesh-status", `Walkmesh: ${mode}, ${floorLabel}${surfaceLabel}, ${group.userData.triangleCount} tris, WASD`);
     } else {
       disposeObject3D(group);
     }
   } catch (error) {
-    walkmeshStatus.textContent = error instanceof Error ? error.message : "Walkmesh: unavailable";
+    setText(".walkmesh-status", error instanceof Error ? error.message : "Walkmesh: unavailable");
   }
 }
 
@@ -1119,8 +1311,10 @@ const state: SceneState = (() => {
   const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 100);
   camera.position.set(0, 0, BASE_CAMERA_Z);
   camera.lookAt(0, 0, 0);
+  const leftCamera = camera.clone();
+  const rightCamera = camera.clone();
 
-  return { renderer, scene, camera, mesh: null };
+  return { renderer, scene, camera, leftCamera, rightCamera, mesh: null };
 })();
 
 function disposeMesh(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null) {
@@ -1140,12 +1334,13 @@ async function showScene(index: number) {
   activeIndex = (index + backgrounds.length) % backgrounds.length;
   const background = backgrounds[activeIndex];
   window.history.replaceState(null, "", `#/scene/${background.generatedAssetId ?? background.id}`);
-  title.textContent = background.mapName;
+  setSceneTitle(background.mapName);
   setViewModeButtonState();
+  setSbsModeButtonState();
   setWalkmeshVisibleButtonState();
   setFloorModeButtonState();
   setDepthSurfaceButtonState();
-  depthStatus.textContent = "Depth: loading";
+  setText(".depth-status", "Depth: loading");
 
   const nextMesh = await makeDepthMesh(background, state, viewMode);
   if (state.mesh) {
@@ -1164,24 +1359,28 @@ async function showScene(index: number) {
   rackTargetDepth = initialFocusDepth;
   rackStartDepth = initialFocusDepth;
   rackElapsedSeconds = 99;
-  focusOutput.value = initialFocusDepth.toFixed(2);
-  depthStatus.textContent =
-    viewMode === "flat2d" ? "Depth: 2D plate" : background.hasGeneratedDepth ? "Depth: Depth Anything" : "Depth: fallback until generated";
+  setFocusOutput(initialFocusDepth);
+  setText(
+    ".depth-status",
+    viewMode === "flat2d" ? "Depth: 2D plate" : background.hasGeneratedDepth ? "Depth: Depth Anything" : "Depth: fallback until generated",
+  );
   void syncWalkmeshOverlay(background);
   renderThumbs();
 }
 
 function renderThumbs() {
-  rail.innerHTML = "";
-  backgrounds.forEach((background, index) => {
-    const button = document.createElement("button");
-    button.className = `thumb ${index === activeIndex ? "active" : ""}`;
-    button.type = "button";
-    button.innerHTML = `<img src="${background.thumbnail}" alt="" loading="lazy" /><strong>${background.mapName}</strong>`;
-    button.addEventListener("click", () => void showScene(index));
-    rail.appendChild(button);
+  root.querySelectorAll<HTMLElement>(".thumb-rail").forEach((rail) => {
+    rail.innerHTML = "";
+    backgrounds.forEach((background, index) => {
+      const button = document.createElement("button");
+      button.className = `thumb ${index === activeIndex ? "active" : ""}`;
+      button.type = "button";
+      button.dataset.sceneIndex = String(index);
+      button.innerHTML = `<img src="${background.thumbnail}" alt="" loading="lazy" /><strong>${background.mapName}</strong>`;
+      rail.appendChild(button);
+    });
+    rail.querySelector(".thumb.active")?.scrollIntoView({ block: "nearest", inline: "center" });
   });
-  rail.querySelector(".thumb.active")?.scrollIntoView({ block: "nearest", inline: "center" });
 }
 
 function resize() {
@@ -1189,8 +1388,13 @@ function resize() {
   const height = canvas.clientHeight;
   state.camera.aspect = width / Math.max(1, height);
   state.camera.updateProjectionMatrix();
+  const eyeAspect = (sbsMode ? width / 2 : width) / Math.max(1, height);
+  state.leftCamera.aspect = eyeAspect;
+  state.rightCamera.aspect = eyeAspect;
+  state.leftCamera.updateProjectionMatrix();
+  state.rightCamera.updateProjectionMatrix();
   state.renderer.setSize(width, height, false);
-  if (state.mesh) fitMeshToViewport(state.mesh, state.camera);
+  if (state.mesh) fitDepthMeshToCurrentViewport(state.mesh);
 }
 
 window.addEventListener("resize", resize);
@@ -1198,13 +1402,17 @@ resize();
 
 canvas.addEventListener("pointermove", (event) => {
   const rect = canvas.getBoundingClientRect();
-  const x = (event.clientX - rect.left) / rect.width;
+  const localX = event.clientX - rect.left;
+  const halfWidth = rect.width * 0.5;
+  const x = localX / rect.width;
   const y = (event.clientY - rect.top) / rect.height;
-  pointerUv.set(x, y);
-  pointerNdc.set(x * 2 - 1, 1 - y * 2);
-  targetYaw = (x - 0.5) * 0.42 * VIEW_ANGLE_MULTIPLIER;
+  const eyeX = sbsMode ? (localX < halfWidth ? localX / halfWidth : (localX - halfWidth) / halfWidth) : x;
+  const lookScale = sbsMode ? 0.5 : 1;
+  pointerUv.set(eyeX, y);
+  pointerNdc.set(eyeX * 2 - 1, 1 - y * 2);
+  targetYaw = (eyeX - 0.5) * 0.42 * VIEW_ANGLE_MULTIPLIER * lookScale;
   targetPitch = (0.5 - y) * 0.18 * VIEW_ANGLE_MULTIPLIER;
-  focusDot.style.left = `${event.clientX - rect.left}px`;
+  focusDot.style.left = `${localX}px`;
   focusDot.style.top = `${event.clientY - rect.top}px`;
 });
 
@@ -1216,29 +1424,7 @@ canvas.addEventListener(
   { passive: false },
 );
 
-root.querySelector("#prev-btn")?.addEventListener("click", () => void showScene(activeIndex - 1));
-root.querySelector("#next-btn")?.addEventListener("click", () => void showScene(activeIndex + 1));
-viewModeButton.addEventListener("click", () => {
-  viewMode = viewMode === "depth3d" ? "flat2d" : "depth3d";
-  setViewModeButtonState();
-  void showScene(activeIndex);
-});
-walkmeshVisibleButton.addEventListener("click", () => {
-  walkmeshVisible = !walkmeshVisible;
-  setWalkmeshVisibleButtonState();
-  void syncWalkmeshOverlay(backgrounds[activeIndex]);
-});
-floorModeButton.addEventListener("click", () => {
-  cycleWalkmeshFloorMode();
-  setFloorModeButtonState();
-  void syncWalkmeshOverlay(backgrounds[activeIndex]);
-});
-depthSurfaceButton.addEventListener("click", () => {
-  cycleDepthSurfaceMode();
-  setDepthSurfaceButtonState();
-  void syncWalkmeshOverlay(backgrounds[activeIndex]);
-});
-root.querySelector("#reset-btn")?.addEventListener("click", () => {
+function resetView() {
   pointerUv.set(0.5, 0.5);
   pointerNdc.set(0, 0);
   focusUv.set(0.5, 0.5);
@@ -1251,10 +1437,51 @@ root.querySelector("#reset-btn")?.addEventListener("click", () => {
   rackTargetDepth = 0.5;
   rackStartDepth = 0.5;
   rackElapsedSeconds = 99;
-  focusOutput.value = lastFocusDepth.toFixed(2);
+  setFocusOutput(lastFocusDepth);
   targetYaw = 0;
   targetPitch = 0;
   if (state.mesh) state.mesh.rotation.set(0, 0, 0);
+}
+
+root.addEventListener("click", (event) => {
+  const thumb = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-scene-index]");
+  if (thumb && root.contains(thumb)) {
+    void showScene(Number(thumb.dataset.sceneIndex ?? activeIndex));
+    return;
+  }
+
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+  if (!button || !root.contains(button)) return;
+  const action = button.dataset.action;
+  if (action === "prev-scene") {
+    void showScene(activeIndex - 1);
+  } else if (action === "next-scene") {
+    void showScene(activeIndex + 1);
+  } else if (action === "vr") {
+    void startImmersiveVr(state.renderer, () => setVrButtonState("VR", false));
+  } else if (action === "reset") {
+    resetView();
+  } else if (action === "view-mode") {
+    viewMode = viewMode === "depth3d" ? "flat2d" : "depth3d";
+    setViewModeButtonState();
+    void showScene(activeIndex);
+  } else if (action === "sbs-mode") {
+    sbsMode = !sbsMode;
+    setSbsModeButtonState();
+    resize();
+  } else if (action === "walkmesh-visible") {
+    walkmeshVisible = !walkmeshVisible;
+    setWalkmeshVisibleButtonState();
+    void syncWalkmeshOverlay(backgrounds[activeIndex]);
+  } else if (action === "floor-mode") {
+    cycleWalkmeshFloorMode();
+    setFloorModeButtonState();
+    void syncWalkmeshOverlay(backgrounds[activeIndex]);
+  } else if (action === "depth-surface") {
+    cycleDepthSurfaceMode();
+    setDepthSurfaceButtonState();
+    void syncWalkmeshOverlay(backgrounds[activeIndex]);
+  }
 });
 
 window.addEventListener("keydown", (event) => {
@@ -1269,12 +1496,52 @@ window.addEventListener("keyup", (event) => {
   movementKeys.delete(event.key.toLowerCase());
 });
 
-xrButton.disabled = true;
+setVrButtonState("VR", true);
 isImmersiveVrSupported().then((supported) => {
-  xrButton.disabled = !supported;
-  xrButton.textContent = supported ? "VR" : "No VR";
+  setVrButtonState(supported ? "VR" : "No VR", !supported);
 });
-xrButton.addEventListener("click", () => void startImmersiveVr(state.renderer, () => (xrButton.textContent = "VR")));
+
+function updateStereoCameras(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>) {
+  const lookTarget = mesh.localToWorld(new THREE.Vector3(0, 0, 0));
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(state.camera.quaternion).normalize();
+  const halfIpd = STEREO_IPD * 0.5;
+  for (const camera of [state.leftCamera, state.rightCamera]) {
+    camera.fov = state.camera.fov;
+    camera.near = state.camera.near;
+    camera.far = state.camera.far;
+    camera.aspect = (sbsMode ? canvas.clientWidth / 2 : canvas.clientWidth) / Math.max(1, canvas.clientHeight);
+    camera.updateProjectionMatrix();
+  }
+  state.leftCamera.position.copy(state.camera.position).addScaledVector(right, -halfIpd);
+  state.rightCamera.position.copy(state.camera.position).addScaledVector(right, halfIpd);
+  state.leftCamera.lookAt(lookTarget);
+  state.rightCamera.lookAt(lookTarget);
+}
+
+function renderScene() {
+  const renderer = state.renderer;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, width, height);
+  renderer.setScissor(0, 0, width, height);
+
+  if (!sbsMode || !state.mesh) {
+    renderer.render(state.scene, state.camera);
+    return;
+  }
+
+  updateStereoCameras(state.mesh);
+  const halfWidth = Math.floor(width / 2);
+  renderer.setScissorTest(true);
+  renderer.setViewport(0, 0, halfWidth, height);
+  renderer.setScissor(0, 0, halfWidth, height);
+  renderer.render(state.scene, state.leftCamera);
+  renderer.setViewport(halfWidth, 0, width - halfWidth, height);
+  renderer.setScissor(halfWidth, 0, width - halfWidth, height);
+  renderer.render(state.scene, state.rightCamera);
+  renderer.setScissorTest(false);
+}
 
 const clock = new THREE.Clock();
 state.renderer.setAnimationLoop(() => {
@@ -1307,7 +1574,7 @@ state.renderer.setAnimationLoop(() => {
     mesh.material.uniforms.focusDepth.value = displayedFocusDepth;
     moveWalkmeshPawn(mesh, deltaSeconds);
   }
-  state.renderer.render(state.scene, state.camera);
+  renderScene();
 });
 
 fetch("/assets/index.json", { cache: "no-store" })
@@ -1321,9 +1588,9 @@ fetch("/assets/index.json", { cache: "no-store" })
     const routeIndex = backgrounds.findIndex((background) => background.id === routeId || background.generatedAssetId === routeId);
     renderThumbs();
     void showScene(routeIndex >= 0 ? routeIndex : 0).catch((error: unknown) => {
-      depthStatus.textContent = error instanceof Error ? error.message : "Unable to build depth scene";
+      setText(".depth-status", error instanceof Error ? error.message : "Unable to build depth scene");
     });
   })
   .catch((error: unknown) => {
-    title.textContent = error instanceof Error ? error.message : "Unable to load gallery";
+    setSceneTitle(error instanceof Error ? error.message : "Unable to load gallery");
   });
