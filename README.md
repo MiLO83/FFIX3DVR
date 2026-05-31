@@ -1,5 +1,7 @@
 # FFIX3DVR
 
+https://youtu.be/EIp4YJxWL2s
+
 FFIX3DVR is a work-in-progress Memoria mod and tooling project for playing Final Fantasy IX with depth-reconstructed field backgrounds, side-by-side 3D output, and WebXR/VR-oriented preview tools.
 
 The current public package is an alpha test. Field scenes, actors, shadows, dialogue UI, battles, and SBS/compare preview modes are the focus right now. Full 3D FMVs are not included yet.
