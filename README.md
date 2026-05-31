@@ -1,43 +1,75 @@
 # FFIX3DVR
 
-Prototype tooling for exploring Final Fantasy IX field backgrounds as depth-driven 3D/parallax scenes, WebXR-friendly previews, and a Memoria Engine runtime patch.
+FFIX3DVR is a work-in-progress Memoria mod and tooling project for playing Final Fantasy IX with depth-reconstructed field backgrounds, side-by-side 3D output, and WebXR/VR-oriented preview tools.
 
-This repository is intentionally sanitized. It does **not** include original FFIX color background plates, ERP/outpainted color panoramas, Gaussian splat color assets, or game binaries. Use it with a legally owned Steam copy of Final Fantasy IX and generate local assets from your own install.
+The current public package is an alpha test. Field scenes, actors, shadows, dialogue UI, battles, and SBS/compare preview modes are the focus right now. Full 3D FMVs are not included yet.
 
-## What Is Included
+## Current Alpha
 
-- `viewer/` - local WebXR/depth gallery prototype.
-- `tools/` - extraction, depth, ERP, ComfyUI, packaging, and Memoria export scripts.
-- `memoria-patch-source/` - mirrored FF9DepthVR Memoria patch source file.
-- `artifacts/*/manifest.json` - scene manifests and metadata.
-- `artifacts/memoria-mod/.../manifest.json` - sanitized Memoria depth scene manifest.
+Download the latest sanitized alpha from the GitHub releases page:
 
-## What Is Not Included
+- [FF9DepthVR 0.2.0 Open Beta 2 (sanitized)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.2)
+
+The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
+
+## What Works Now
+
+- Depth-reconstructed field backgrounds for the currently exported scene set.
+- SBS 3D mode for field gameplay.
+- Compare mode for showing vanilla-style 2D on one side and depth/SBS work on the other.
+- Battle SBS camera and hand cursor handling.
+- Dialogue/menu duplication for SBS play.
+- Actor, shadow, and small field effect grounding fixes for camera perspective movement.
+- `depth-gallery.html` for browsing depth scenes and comparing 2D/3D output in a browser.
+
+## FMV Status
+
+3D FMVs are still being generated and integrated.
+
+The FMV Depth-Anything batch is still rendering frame-by-frame depth data locally. As of the May 31 alpha work session, the batch had completed roughly 20k frames and was still progressing through later FMVs. The full target is expected to be around 72k FMV frames, so completion depends on uninterrupted GPU runtime, failed-frame reruns, and final packaging.
+
+Current estimate: a few days of continued local batch processing for the full FMV depth set, followed by an implementation/testing pass before 3D FMVs can be included in a release.
+
+Important FMV limitations in this alpha:
+
+- 3D FMV depth playback is not shipped in the public package yet.
+- FMVs currently use the safer native playback path instead of full depth-displaced 3D movie surfaces.
+- Field backgrounds that transition into FMV playback still need a consistently working implementation for animated FMV background plates.
+- FMVs with actors or walkmesh interaction will need per-frame depth projection once the depth sequences are complete.
+
+## Sanitized Repository
+
+This repository and its release packages are intentionally sanitized. They do not include copyrighted Final Fantasy IX color background plates, original FMV frames, ERP/outpainted color panoramas, Gaussian splat color assets, Steam game files, or game binaries.
+
+You need a legally owned Steam copy of Final Fantasy IX. Local tools can generate or consume assets from your own install.
+
+## Included
+
+- `viewer/` - local browser depth gallery and WebXR-oriented preview code.
+- `tools/` - extraction, depth, packaging, and Memoria export scripts.
+- `memoria-patch-source/` - mirrored FF9DepthVR Memoria patch source.
+- Sanitized manifests, depth maps, walkmesh/camera metadata, and mod packaging metadata.
+
+## Not Included
 
 - Original FFIX `source_plate*.png` background plates.
+- Original FMV color frames or movies.
 - Outpainted/color ERP panoramas.
-- Gaussian splat/PLY scene assets.
-- Steam game files, Memoria build outputs, or patched DLLs.
-- Local virtual environments, `node_modules`, and generated build folders.
+- Gaussian splat/PLY/KSPLAT color assets.
+- Steam game files, local virtual environments, `node_modules`, and generated build folders.
 
-## Local Package
+## Rebuilding The Sanitized Package
 
-The local sanitized ZIP can be rebuilt with:
+From the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\package_sanitized_release.ps1
 ```
 
-That package keeps source code, scripts, depth maps, manifests, and JSON metadata while excluding copyrighted/color-derived background assets.
+That package keeps source code, scripts, generated depth data, manifests, and JSON metadata while excluding copyrighted/color-derived assets.
 
-## Development Notes
+## Project Direction
 
-The current Memoria patch experiments with:
+The short-term goal is a playable alpha with stable field and battle SBS support, then full FMV depth playback once the batch render completes. After that, the next major target is VR compatibility testing on real headset hardware.
 
-- replacing static 2D field plates with a generated depth plate,
-- warping foreground masks with the same plate projection,
-- pinning actors/shadows to depth-adjusted background motion,
-- toggling the replacement plate with vanilla fallback behavior,
-- DOF/focus and mouse-driven parallax experiments.
-
-This is research/prototype code, not a finished mod release.
+This is research-heavy modding work, not a finished release. Feedback, screenshots, bug reports, and scene-specific notes are welcome.
