@@ -14,6 +14,7 @@ type SceneState = {
   leftCamera: THREE.PerspectiveCamera;
   rightCamera: THREE.PerspectiveCamera;
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null;
+  compareMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null;
 };
 
 type WalkmeshData = {
@@ -43,6 +44,7 @@ type CameraData = {
 
 type WalkmeshMode = "depth";
 type ViewMode = "depth3d" | "flat2d";
+type SbsMode = "off" | "stereo3d" | "compare";
 type WalkmeshFloorMode = "active" | "all" | number;
 type DepthSurfaceMode = "ground" | "nearest" | "farthest";
 
@@ -71,7 +73,7 @@ function controlPanelMarkup(kind: "main" | "left" | "right") {
   const stereoClass = kind === "main" ? "" : ` stereo-panel stereo-${kind}`;
   const idSuffix = kind === "main" ? "" : `-${kind}`;
   return `
-      <aside class="control-panel${stereoClass}" aria-label="${kind === "main" ? "Depth controls" : `${kind} eye depth controls`}">
+      <aside class="control-panel${stereoClass}" data-panel="${kind}" aria-label="${kind === "main" ? "Depth controls" : `${kind} eye depth controls`}">
         <div class="control-buttons">
           <label class="readout-row">
             <span>Mouse Z</span>
@@ -513,8 +515,10 @@ let rackStartDepth = 0.5;
 let rackElapsedSeconds = 99;
 let walkmeshMode: WalkmeshMode = "depth";
 let walkmeshVisible = false;
-let sbsMode = false;
+let sbsMode: SbsMode = "off";
 let viewMode: ViewMode = "depth3d";
+let leftViewMode: ViewMode = "depth3d";
+let rightViewMode: ViewMode = "depth3d";
 let walkmeshFloorMode: WalkmeshFloorMode = "active";
 let depthSurfaceMode: DepthSurfaceMode = "farthest";
 let availableWalkmeshFloors: number[] = [];
@@ -545,6 +549,32 @@ function setFocusOutput(value: number) {
   });
 }
 
+function isSplitMode() {
+  return sbsMode !== "off";
+}
+
+function isCompareMode() {
+  return sbsMode === "compare";
+}
+
+function toggleViewMode(mode: ViewMode): ViewMode {
+  return mode === "depth3d" ? "flat2d" : "depth3d";
+}
+
+function panelKindForButton(button: HTMLElement): "main" | "left" | "right" {
+  const panel = button.closest<HTMLElement>("[data-panel]")?.dataset.panel;
+  return panel === "left" || panel === "right" ? panel : "main";
+}
+
+function viewModeForPanel(kind: "main" | "left" | "right") {
+  return kind === "left" ? leftViewMode : kind === "right" ? rightViewMode : viewMode;
+}
+
+function setSplitViewModes(left: ViewMode, right: ViewMode) {
+  leftViewMode = left;
+  rightViewMode = right;
+}
+
 function fitMeshToViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>, camera: THREE.PerspectiveCamera) {
   const baseWidth = Number(mesh.userData.baseWidth) || 1;
   const baseHeight = Number(mesh.userData.baseHeight) || 1;
@@ -558,7 +588,7 @@ function fitMeshToViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMat
 
 function fitDepthMeshToCurrentViewport(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>) {
   fitMeshToViewport(mesh, state.camera);
-  if (sbsMode) mesh.scale.x *= 0.5;
+  if (isSplitMode()) mesh.scale.x *= 0.5;
 }
 
 function toBackgrounds(manifest: AssetManifest): GalleryBackground[] {
@@ -1173,17 +1203,20 @@ function disposeObject3D(object: THREE.Object3D) {
 
 function setViewModeButtonState() {
   root.querySelectorAll<HTMLButtonElement>('[data-control="view-mode"]').forEach((button) => {
-    button.textContent = viewMode === "flat2d" ? "View 3D" : "View 2D";
-    button.classList.toggle("active", viewMode === "flat2d");
+    const mode = viewModeForPanel(panelKindForButton(button));
+    button.textContent = mode === "flat2d" ? "View 3D" : "View 2D";
+    button.classList.toggle("active", mode === "flat2d");
   });
 }
 
 function setSbsModeButtonState() {
-  root.classList.toggle("sbs-mode", sbsMode);
+  const splitMode = isSplitMode();
+  root.classList.toggle("sbs-mode", splitMode);
+  root.classList.toggle("compare-mode", isCompareMode());
   root.querySelectorAll<HTMLButtonElement>('[data-control="sbs-mode"]').forEach((button) => {
-    button.textContent = sbsMode ? "SBS On" : "SBS 3D";
-    button.setAttribute("aria-pressed", String(sbsMode));
-    button.classList.toggle("active", sbsMode);
+    button.textContent = sbsMode === "compare" ? "Compare" : sbsMode === "stereo3d" ? "SBS On" : "SBS 3D";
+    button.setAttribute("aria-pressed", String(splitMode));
+    button.classList.toggle("active", splitMode);
   });
 }
 
@@ -1314,7 +1347,7 @@ const state: SceneState = (() => {
   const leftCamera = camera.clone();
   const rightCamera = camera.clone();
 
-  return { renderer, scene, camera, leftCamera, rightCamera, mesh: null };
+  return { renderer, scene, camera, leftCamera, rightCamera, mesh: null, compareMesh: null };
 })();
 
 function disposeMesh(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null) {
@@ -1327,6 +1360,15 @@ function disposeMesh(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
   mesh.material.uniforms.colorMap.value.dispose();
   mesh.material.uniforms.depthMap.value.dispose();
   mesh.material.dispose();
+}
+
+function meshForViewMode(mode: ViewMode) {
+  return mode === "flat2d" && state.compareMesh ? state.compareMesh : state.mesh;
+}
+
+function setRenderMesh(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null) {
+  if (state.mesh) state.mesh.visible = state.mesh === mesh;
+  if (state.compareMesh) state.compareMesh.visible = state.compareMesh === mesh;
 }
 
 async function showScene(index: number) {
@@ -1342,13 +1384,21 @@ async function showScene(index: number) {
   setDepthSurfaceButtonState();
   setText(".depth-status", "Depth: loading");
 
-  const nextMesh = await makeDepthMesh(background, state, viewMode);
+  const nextMesh = await makeDepthMesh(background, state, "depth3d");
+  const nextCompareMesh = await makeDepthMesh(background, state, "flat2d");
+  nextCompareMesh.visible = false;
   if (state.mesh) {
     state.scene.remove(state.mesh);
     disposeMesh(state.mesh);
   }
+  if (state.compareMesh) {
+    state.scene.remove(state.compareMesh);
+    disposeMesh(state.compareMesh);
+  }
   state.mesh = nextMesh;
+  state.compareMesh = nextCompareMesh;
   state.scene.add(nextMesh);
+  state.scene.add(nextCompareMesh);
   const initialFocusDepth = sampleShaderDepth(nextMesh, focusUv);
   lastFocusDepth = initialFocusDepth;
   targetFocusDepth = initialFocusDepth;
@@ -1388,13 +1438,14 @@ function resize() {
   const height = canvas.clientHeight;
   state.camera.aspect = width / Math.max(1, height);
   state.camera.updateProjectionMatrix();
-  const eyeAspect = (sbsMode ? width / 2 : width) / Math.max(1, height);
+  const eyeAspect = (isSplitMode() ? width / 2 : width) / Math.max(1, height);
   state.leftCamera.aspect = eyeAspect;
   state.rightCamera.aspect = eyeAspect;
   state.leftCamera.updateProjectionMatrix();
   state.rightCamera.updateProjectionMatrix();
   state.renderer.setSize(width, height, false);
   if (state.mesh) fitDepthMeshToCurrentViewport(state.mesh);
+  if (state.compareMesh) fitDepthMeshToCurrentViewport(state.compareMesh);
 }
 
 window.addEventListener("resize", resize);
@@ -1406,8 +1457,8 @@ canvas.addEventListener("pointermove", (event) => {
   const halfWidth = rect.width * 0.5;
   const x = localX / rect.width;
   const y = (event.clientY - rect.top) / rect.height;
-  const eyeX = sbsMode ? (localX < halfWidth ? localX / halfWidth : (localX - halfWidth) / halfWidth) : x;
-  const lookScale = sbsMode ? 0.5 : 1;
+  const eyeX = isSplitMode() ? (localX < halfWidth ? localX / halfWidth : (localX - halfWidth) / halfWidth) : x;
+  const lookScale = isSplitMode() ? 0.5 : 1;
   pointerUv.set(eyeX, y);
   pointerNdc.set(eyeX * 2 - 1, 1 - y * 2);
   targetYaw = (eyeX - 0.5) * 0.42 * VIEW_ANGLE_MULTIPLIER * lookScale;
@@ -1441,6 +1492,7 @@ function resetView() {
   targetYaw = 0;
   targetPitch = 0;
   if (state.mesh) state.mesh.rotation.set(0, 0, 0);
+  if (state.compareMesh) state.compareMesh.rotation.set(0, 0, 0);
 }
 
 root.addEventListener("click", (event) => {
@@ -1462,12 +1514,22 @@ root.addEventListener("click", (event) => {
   } else if (action === "reset") {
     resetView();
   } else if (action === "view-mode") {
-    viewMode = viewMode === "depth3d" ? "flat2d" : "depth3d";
+    const panelKind = panelKindForButton(button);
+    if (isSplitMode() && panelKind === "left") {
+      leftViewMode = toggleViewMode(leftViewMode);
+    } else if (isSplitMode() && panelKind === "right") {
+      rightViewMode = toggleViewMode(rightViewMode);
+    } else {
+      viewMode = toggleViewMode(viewMode);
+      setSplitViewModes(viewMode, viewMode);
+    }
     setViewModeButtonState();
-    void showScene(activeIndex);
   } else if (action === "sbs-mode") {
-    sbsMode = !sbsMode;
+    sbsMode = sbsMode === "off" ? "stereo3d" : sbsMode === "stereo3d" ? "compare" : "off";
+    if (sbsMode === "stereo3d") setSplitViewModes("depth3d", "depth3d");
+    else if (sbsMode === "compare") setSplitViewModes("flat2d", "depth3d");
     setSbsModeButtonState();
+    setViewModeButtonState();
     resize();
   } else if (action === "walkmesh-visible") {
     walkmeshVisible = !walkmeshVisible;
@@ -1505,17 +1567,36 @@ function updateStereoCameras(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderM
   const lookTarget = mesh.localToWorld(new THREE.Vector3(0, 0, 0));
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(state.camera.quaternion).normalize();
   const halfIpd = STEREO_IPD * 0.5;
+  const useStereoIpd = sbsMode === "stereo3d" && leftViewMode === "depth3d" && rightViewMode === "depth3d";
   for (const camera of [state.leftCamera, state.rightCamera]) {
     camera.fov = state.camera.fov;
     camera.near = state.camera.near;
     camera.far = state.camera.far;
-    camera.aspect = (sbsMode ? canvas.clientWidth / 2 : canvas.clientWidth) / Math.max(1, canvas.clientHeight);
+    camera.aspect = (isSplitMode() ? canvas.clientWidth / 2 : canvas.clientWidth) / Math.max(1, canvas.clientHeight);
     camera.updateProjectionMatrix();
   }
-  state.leftCamera.position.copy(state.camera.position).addScaledVector(right, -halfIpd);
-  state.rightCamera.position.copy(state.camera.position).addScaledVector(right, halfIpd);
-  state.leftCamera.lookAt(lookTarget);
-  state.rightCamera.lookAt(lookTarget);
+
+  syncEyeCamera(state.leftCamera, leftViewMode, useStereoIpd ? -halfIpd : 0, lookTarget, right, useStereoIpd);
+  syncEyeCamera(state.rightCamera, rightViewMode, useStereoIpd ? halfIpd : 0, lookTarget, right, useStereoIpd);
+}
+
+function syncEyeCamera(
+  camera: THREE.PerspectiveCamera,
+  mode: ViewMode,
+  ipdOffset: number,
+  lookTarget: THREE.Vector3,
+  right: THREE.Vector3,
+  useLookAt: boolean,
+) {
+  if (mode === "flat2d") {
+    camera.position.set(0, 0, BASE_CAMERA_Z);
+    camera.lookAt(0, 0, 0);
+    return;
+  }
+
+  camera.position.copy(state.camera.position).addScaledVector(right, ipdOffset);
+  if (useLookAt) camera.lookAt(lookTarget);
+  else camera.quaternion.copy(state.camera.quaternion);
 }
 
 function renderScene() {
@@ -1526,7 +1607,10 @@ function renderScene() {
   renderer.setViewport(0, 0, width, height);
   renderer.setScissor(0, 0, width, height);
 
-  if (!sbsMode || !state.mesh) {
+  if (!state.mesh) return;
+
+  if (!isSplitMode()) {
+    setRenderMesh(meshForViewMode(viewMode));
     renderer.render(state.scene, state.camera);
     return;
   }
@@ -1536,10 +1620,13 @@ function renderScene() {
   renderer.setScissorTest(true);
   renderer.setViewport(0, 0, halfWidth, height);
   renderer.setScissor(0, 0, halfWidth, height);
+  setRenderMesh(meshForViewMode(leftViewMode));
   renderer.render(state.scene, state.leftCamera);
   renderer.setViewport(halfWidth, 0, width - halfWidth, height);
   renderer.setScissor(halfWidth, 0, width - halfWidth, height);
+  setRenderMesh(meshForViewMode(rightViewMode));
   renderer.render(state.scene, state.rightCamera);
+  setRenderMesh(meshForViewMode(viewMode));
   renderer.setScissorTest(false);
 }
 
@@ -1551,27 +1638,35 @@ state.renderer.setAnimationLoop(() => {
   const wiggle = LOCKED_WIGGLE;
   const mesh = state.mesh;
   if (mesh) {
+    const depthViewActive = viewMode === "depth3d" || (isSplitMode() && (leftViewMode === "depth3d" || rightViewMode === "depth3d"));
     const autoWiggleX = Math.sin(t * 0.9) * 0.035 * wiggle;
     const autoWiggleY = Math.cos(t * 0.73 + 0.8) * 0.018 * wiggle;
     const autoWiggleZ = Math.sin(t * 0.57 + 1.35) * 0.12 * wiggle;
-    if (viewMode === "flat2d") {
+    if (!depthViewActive) {
       mesh.rotation.x += (0 - mesh.rotation.x) * 0.2;
       mesh.rotation.y += (0 - mesh.rotation.y) * 0.2;
     } else {
       mesh.rotation.y += (targetYaw * wiggle * TILT_MULTIPLIER + autoWiggleX - mesh.rotation.y) * 0.075;
       mesh.rotation.x += (targetPitch * wiggle * TILT_MULTIPLIER + autoWiggleY - mesh.rotation.x) * 0.075;
     }
-    state.camera.position.set(0, 0, BASE_CAMERA_Z + (viewMode === "flat2d" ? 0 : autoWiggleZ));
+    state.camera.position.set(0, 0, BASE_CAMERA_Z + (depthViewActive ? autoWiggleZ : 0));
     state.camera.lookAt(0, 0, 0);
     const targetDepth = syncFocusFromPointer(mesh);
     const focusDepth = updateAutofocus(targetDepth, deltaSeconds, t);
     const focusLerp = 1 - Math.exp(-deltaSeconds * 1.875);
     const dofLerp = 1 - Math.exp(-deltaSeconds * 1.25);
     displayedFocusDepth = THREE.MathUtils.lerp(displayedFocusDepth, focusDepth, focusLerp);
-    displayedDofAmount = THREE.MathUtils.lerp(displayedDofAmount, viewMode === "flat2d" ? 0 : LOCKED_DOF, dofLerp);
+    displayedDofAmount = THREE.MathUtils.lerp(displayedDofAmount, depthViewActive ? LOCKED_DOF : 0, dofLerp);
     mesh.material.uniforms.focusUv.value.copy(focusUv);
     mesh.material.uniforms.dofAmount.value = displayedDofAmount;
     mesh.material.uniforms.focusDepth.value = displayedFocusDepth;
+    if (state.compareMesh) {
+      state.compareMesh.rotation.set(0, 0, 0);
+      state.compareMesh.position.set(0, 0, 0);
+      state.compareMesh.material.uniforms.focusUv.value.set(0.5, 0.5);
+      state.compareMesh.material.uniforms.dofAmount.value = 0;
+      state.compareMesh.material.uniforms.focusDepth.value = 0.5;
+    }
     moveWalkmeshPawn(mesh, deltaSeconds);
   }
   renderScene();

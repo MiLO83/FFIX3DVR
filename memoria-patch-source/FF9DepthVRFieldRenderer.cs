@@ -13,6 +13,13 @@ namespace Memoria.FF9DepthVR
 {
     public static class FF9DepthVRFieldRenderer
     {
+        public enum DepthViewMode
+        {
+            Depth = 0,
+            Stereo3D = 1,
+            Compare = 2
+        }
+
         private const String ManifestPath = "Data/FF9DepthVR/manifest.json";
         internal const String RootName = "FF9DepthVR_Background";
         private const Single DepthUnitScale = 32f;
@@ -28,30 +35,65 @@ namespace Memoria.FF9DepthVR
         private static RenderDefaults _defaults = new RenderDefaults();
         private static String _lastLoggedSceneId;
         private static Int32 _lastSbsToggleFrame = -1;
+        private static Int32 _lastActorLookToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
         private static Boolean _movieDebugOverlayEnabled;
         private static FF9DepthVRMovieBgPlate _activeMoviePlate;
         private static global::FieldMap _activeMovieFieldMap;
+        private static FF9DepthVRNativeMoviePlaneSbsScaler _activeNativeMoviePlaneScaler;
         internal static Boolean PlateVisible = true;
+        public static DepthViewMode ViewMode = DepthViewMode.Depth;
         public static Boolean SbsEnabled = false;
+        public static Boolean ActorLookEnabled = false;
         public static Boolean WasSbsToggleInputHandledThisFrame => _lastSbsToggleFrame == Time.frameCount;
+        internal static Boolean CompareEnabled => ViewMode == DepthViewMode.Compare;
         internal static Boolean MovieDebugOverlayEnabled => _movieDebugOverlayEnabled;
         internal static Boolean MoviePlateActive => _activeMoviePlate != null && _activeMoviePlate.IsActive;
+        internal static Boolean IsMbgPlaybackActive()
+        {
+            try
+            {
+                if (global::MBG.IsNull)
+                    return false;
+
+                global::MBG mbg = global::MBG.Instance;
+                return mbg != null && !mbg.IsFinishedForDisableBooster();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         internal static Single DefaultSourceScale => _defaults.SourceScale;
         internal static Single DefaultGeometryDepthScale => _defaults.GeometryDepthScale > 0f ? _defaults.GeometryDepthScale : Mathf.Max(1f, _defaults.DepthStrength * DepthUnitScale);
         internal static Single DefaultParallaxStrength => _defaults.ParallaxStrength;
         internal static Single DefaultIdleParallaxStrength => _defaults.IdleParallaxStrength;
         internal static Single MoviePlateDistance => 2f;
         internal static Single MovieStandaloneDepthScale => 0.35f;
+        private static readonly Boolean EnableFieldMovieDepthPlate = false;
 
         public static Boolean TryHandleSbsToggleInput()
         {
-            if ((!Input.GetKeyDown(KeyCode.F9) && !Input.GetKeyDown(KeyCode.F8)) || _lastSbsToggleFrame == Time.frameCount)
-                return false;
+            Boolean actorLookHandled = TryHandleActorLookToggleInput();
+            if (!Input.GetKeyDown(KeyCode.F9) || _lastSbsToggleFrame == Time.frameCount)
+                return actorLookHandled;
 
             _lastSbsToggleFrame = Time.frameCount;
-            SbsEnabled = !SbsEnabled;
-            Log.Message("[FF9DepthVR] SBS enabled = " + SbsEnabled + " (F8/F9)");
+            ViewMode = ViewMode == DepthViewMode.Depth ? DepthViewMode.Stereo3D : ViewMode == DepthViewMode.Stereo3D ? DepthViewMode.Compare : DepthViewMode.Depth;
+            SbsEnabled = ViewMode != DepthViewMode.Depth;
+            Log.Message("[FF9DepthVR] View mode = " + ViewMode + " (F9)");
+            return true;
+        }
+
+        public static Boolean TryHandleActorLookToggleInput()
+        {
+            if (!Input.GetKeyDown(KeyCode.F8) || _lastActorLookToggleFrame == Time.frameCount)
+                return false;
+
+            _lastActorLookToggleFrame = Time.frameCount;
+            ActorLookEnabled = !ActorLookEnabled;
+            Log.Message("[FF9DepthVR] Actor look assist enabled = " + ActorLookEnabled + " (F8)");
             return true;
         }
 
@@ -91,6 +133,12 @@ namespace Memoria.FF9DepthVR
                 Log.Message("[FF9DepthVR] Field movie BGPlate skipped: no MovieMaterial.");
                 return;
             }
+            if (!EnableFieldMovieDepthPlate)
+            {
+                Log.Message("[FF9DepthVR] Field movie BGPlate disabled; native movie remains active for movie=" + movieMaterial.movieKey + ".");
+                BeginNativeMoviePlaneSbs(nativeMoviePlane);
+                return;
+            }
             if (!HasDepthReplacement(fieldMap))
             {
                 Log.Message("[FF9DepthVR] Field movie BGPlate skipped: no active field depth BGPlate for movie=" + movieMaterial.movieKey + ".");
@@ -107,7 +155,6 @@ namespace Memoria.FF9DepthVR
             _activeMovieFieldMap = fieldMap;
             _activeMoviePlate = moviePlate;
             moviePlate.Initialize(fieldMap, movieMaterial, nativeMoviePlane);
-            SetDepthReplacementVisible(fieldMap, false);
         }
 
         internal static void BeginMoviePlate(global::FieldMap fieldMap, MovieMaterial movieMaterial, GameObject nativeMoviePlane, Camera movieCamera)
@@ -129,6 +176,7 @@ namespace Memoria.FF9DepthVR
                 return;
             }
 
+            EndNativeMoviePlaneSbs();
             if (_activeMoviePlate != null && _activeMovieFieldMap != null)
                 EndFieldMoviePlate(_activeMovieFieldMap);
 
@@ -143,6 +191,7 @@ namespace Memoria.FF9DepthVR
 
         internal static void EndFieldMoviePlate(global::FieldMap fieldMap)
         {
+            EndNativeMoviePlaneSbs();
             global::FieldMap target = fieldMap != null ? fieldMap : _activeMovieFieldMap;
             FF9DepthVRMovieBgPlate moviePlate = _activeMoviePlate;
             if (moviePlate == null && target != null)
@@ -162,6 +211,34 @@ namespace Memoria.FF9DepthVR
         internal static Boolean IsMoviePlateActiveFor(global::FieldMap fieldMap)
         {
             return MoviePlateActive && (_activeMovieFieldMap == null || fieldMap == null || _activeMovieFieldMap == fieldMap);
+        }
+
+        private static void BeginNativeMoviePlaneSbs(GameObject nativeMoviePlane)
+        {
+            if (nativeMoviePlane == null)
+            {
+                Log.Message("[FF9DepthVR] Native field movie SBS scaler skipped: no native movie plane.");
+                return;
+            }
+
+            if (_activeNativeMoviePlaneScaler != null && _activeNativeMoviePlaneScaler.gameObject != nativeMoviePlane)
+                EndNativeMoviePlaneSbs();
+
+            FF9DepthVRNativeMoviePlaneSbsScaler scaler = nativeMoviePlane.GetComponent<FF9DepthVRNativeMoviePlaneSbsScaler>();
+            if (scaler == null)
+                scaler = nativeMoviePlane.AddComponent<FF9DepthVRNativeMoviePlaneSbsScaler>();
+
+            _activeNativeMoviePlaneScaler = scaler;
+            scaler.Initialize(nativeMoviePlane);
+        }
+
+        private static void EndNativeMoviePlaneSbs()
+        {
+            if (_activeNativeMoviePlaneScaler == null)
+                return;
+
+            _activeNativeMoviePlaneScaler.Shutdown();
+            _activeNativeMoviePlaneScaler = null;
         }
 
         internal static void ApplyActorCameraScroll(global::FieldMap fieldMap)
@@ -1009,6 +1086,8 @@ namespace Memoria.FF9DepthVR
         private Boolean _hasLastMousePosition;
         private Boolean _controllerLookMode;
         private Vector2 _lookFocusUv = new Vector2(0.5f, 0.5f);
+        private Vector2 _actorLookUv = new Vector2(0.5f, 0.5f);
+        private Boolean _hasActorLookTarget;
         private const Single ControllerLookDeadzone = 0.18f;
         private const Single ControllerLookMouseWakePixels = 2f;
         private static readonly Boolean EnableCpuDofFallback = false;
@@ -1273,7 +1352,7 @@ namespace Memoria.FF9DepthVR
                 _controllerLookMode = true;
                 _lastMousePosition = mousePosition;
                 _hasLastMousePosition = true;
-                return controllerLook;
+                return AddActorLookBaseline(controllerLook);
             }
 
             if (_controllerLookMode)
@@ -1288,15 +1367,35 @@ namespace Memoria.FF9DepthVR
                 {
                     _controllerLookMode = false;
                     _lastMousePosition = mousePosition;
-                    return mouseLook;
+                    return AddActorLookBaseline(mouseLook);
                 }
 
-                return Vector2.zero;
+                return AddActorLookBaseline(Vector2.zero);
             }
 
             _lastMousePosition = mousePosition;
             _hasLastMousePosition = true;
-            return mouseLook;
+            return AddActorLookBaseline(mouseLook);
+        }
+
+        private Vector2 AddActorLookBaseline(Vector2 manualLook)
+        {
+            Vector2 actorLook = ActorLookBaselineNormalized();
+            return new Vector2(
+                Mathf.Clamp(manualLook.x + actorLook.x, -1f, 1f),
+                Mathf.Clamp(manualLook.y + actorLook.y, -1f, 1f)
+            );
+        }
+
+        private Vector2 ActorLookBaselineNormalized()
+        {
+            if (!FF9DepthVRFieldRenderer.ActorLookEnabled || !_hasActorLookTarget)
+                return Vector2.zero;
+
+            return new Vector2(
+                Mathf.Clamp((_actorLookUv.x - 0.5f) * 2f, -1f, 1f),
+                Mathf.Clamp((_actorLookUv.y - 0.5f) * 2f, -1f, 1f)
+            );
         }
 
         private static Boolean TryReadControllerLook(out Vector2 look)
@@ -1396,14 +1495,17 @@ namespace Memoria.FF9DepthVR
                 _focusBiasX = 0f;
                 _focusBiasY = 0f;
                 _focusZoom = 0f;
+                _hasActorLookTarget = false;
                 return;
             }
 
             _focusPivotX = Mathf.Clamp01(plateX / Mathf.Max(1f, _width));
             _focusPivotY = Mathf.Clamp01(plateY / Mathf.Max(1f, _height));
-            _focusBiasX = Mathf.Clamp((_focusPivotX - 0.5f) * 0.35f, -0.2f, 0.2f);
-            _focusBiasY = Mathf.Clamp((_focusPivotY - 0.5f) * 0.35f, -0.2f, 0.2f);
-            _focusZoom = 0.025f;
+            _actorLookUv = new Vector2(_focusPivotX, _focusPivotY);
+            _hasActorLookTarget = true;
+            _focusBiasX = 0f;
+            _focusBiasY = 0f;
+            _focusZoom = 0f;
         }
     }
 
@@ -1534,6 +1636,13 @@ namespace Memoria.FF9DepthVR
         {
             if (_fieldMap == null)
                 return;
+
+            if (FF9DepthVRFieldRenderer.IsMbgPlaybackActive())
+            {
+                ApplyActorsWithoutDepthOffsets();
+                return;
+            }
+
             if (_parallax != null)
                 _parallax.RefreshGeometryNow();
 
@@ -1555,6 +1664,10 @@ namespace Memoria.FF9DepthVR
             Int32 materialPinCount = 0;
             Int32 materialOffsetCount = 0;
             Int32 surfaceHitCount = 0;
+            Vector3 actorLookAccumulator = Vector3.zero;
+            Int32 actorLookCount = 0;
+            Vector3 playerLookProjected = Vector3.zero;
+            Boolean hasPlayerLook = false;
             Boolean shouldDeepLog = _deepLogTimer <= 0f;
             StringBuilder deepLog = shouldDeepLog ? BeginDeepDebugLog(actors.Length, prepareRenderers) : null;
             Int32 deepLoggedActors = 0;
@@ -1586,6 +1699,17 @@ namespace Memoria.FF9DepthVR
                     plateFoot = ProjectedToPlateLocal(projectedFoot);
                     depthCenter = SampleDepthAt(plateFoot) - 0.5f;
                 }
+                FieldMapActorController actorController = actor.GetComponent<FieldMapActorController>();
+                if (actorController != null && actorController.isPlayer)
+                {
+                    playerLookProjected = projectedFoot;
+                    hasPlayerLook = true;
+                }
+                if (IsPlatePointOnscreen(plateFoot))
+                {
+                    actorLookAccumulator += projectedFoot;
+                    actorLookCount++;
+                }
                 Int32 offsetMaterials;
                 Single screenDelta = ApplyVisualActorGroundGlue(actor, projectedFoot, actorOffset, out offsetMaterials);
                 if (shouldDeepLog && deepLoggedActors < DeepLogActorLimit)
@@ -1603,7 +1727,19 @@ namespace Memoria.FF9DepthVR
                 focusCount++;
             }
             if (_parallax != null)
-                _parallax.SetActorFocus(0f, 0f, false);
+            {
+                if (FF9DepthVRFieldRenderer.ActorLookEnabled && (actorLookCount > 0 || hasPlayerLook))
+                {
+                    Vector3 actorAverage = actorLookCount > 0 ? actorLookAccumulator / actorLookCount : playerLookProjected;
+                    Vector3 weightedTarget = hasPlayerLook ? (actorAverage + playerLookProjected * 3f) * 0.25f : actorAverage;
+                    Vector3 plateTarget = ProjectedToPlateLocal(weightedTarget);
+                    _parallax.SetActorFocus(plateTarget.x, plateTarget.y, true);
+                }
+                else
+                {
+                    _parallax.SetActorFocus(0f, 0f, false);
+                }
+            }
 
             if (shouldDeepLog)
             {
@@ -1624,6 +1760,37 @@ namespace Memoria.FF9DepthVR
                 _logTimer = 5f;
                 Vector2 avgOffset = compositedActors > 0 ? offsetAccumulator / compositedActors : Vector2.zero;
                 Log.Message("[FF9DepthVR] Actor composite actors=" + compositedActors + " bodyRenderers=" + totalRenderers + " prepared=" + compositedRenderers + " queue=" + _renderQueue + " shader=" + (_forceCompositeShader && _compositeShader != null ? _compositeShader.name : "original") + " depthCast=walkmesh offset=depthPlate avgOffset=" + avgOffset + " maxOffset=" + maxOffset.ToString("F2") + " pinScale=" + ActorPinDiagnosticScale.ToString("F1") + " pinMode=walkmeshReproject surfaceHits=" + surfaceHitCount + " materialsWithOffset=" + materialOffsetCount + " materialPins=" + materialPinCount + " maxScreenDelta=" + maxScreenDelta.ToString("F2") + " afterSmooth=" + (!prepareRenderers));
+            }
+        }
+
+        private void ApplyActorsWithoutDepthOffsets()
+        {
+            FieldMapActor[] actors = UnityEngine.Object.FindObjectsOfType<FieldMapActor>();
+            _logTimer -= Time.deltaTime;
+
+            Int32 actorCount = 0;
+            Int32 materialCount = 0;
+            for (Int32 i = 0; i < actors.Length; i++)
+            {
+                FieldMapActor actor = actors[i];
+                if (actor == null || actor.transform == null || actor.transform.root != _fieldMap.transform.root)
+                    continue;
+
+                FieldMapActorController controller = actor.GetComponent<FieldMapActorController>();
+                if (controller != null)
+                    actor.transform.localPosition = controller.curPos;
+
+                materialCount += ApplyActorProjectionOffset(actor, Vector2.zero);
+                actorCount++;
+            }
+
+            if (_parallax != null)
+                _parallax.SetActorFocus(0f, 0f, false);
+
+            if (_logTimer <= 0f)
+            {
+                _logTimer = 5f;
+                Log.Message("[FF9DepthVR] MBG playback active; actor depth offsets suppressed actors=" + actorCount + " materialsReset=" + materialCount);
             }
         }
 
@@ -1738,6 +1905,12 @@ namespace Memoria.FF9DepthVR
             }
 
             return true;
+        }
+
+        private Boolean IsPlatePointOnscreen(Vector3 platePoint)
+        {
+            const Single margin = 16f;
+            return platePoint.x >= -margin && platePoint.x <= _plateWidth + margin && platePoint.y >= -margin && platePoint.y <= _plateHeight + margin;
         }
 
         private Vector3 ProjectedToPlateLocal(Vector3 projected)
@@ -2365,6 +2538,61 @@ namespace Memoria.FF9DepthVR
         }
     }
 
+    public sealed class FF9DepthVRCompareCameraCull : MonoBehaviour
+    {
+        private readonly Dictionary<Renderer, Boolean> _savedStates = new Dictionary<Renderer, Boolean>();
+        private Renderer[] _depthRenderers;
+        private Boolean _hideDepth;
+
+        public void Configure(Renderer[] depthRenderers, Boolean hideDepth)
+        {
+            RestoreSavedStates();
+            _depthRenderers = depthRenderers;
+            _hideDepth = hideDepth;
+            enabled = _hideDepth && _depthRenderers != null && _depthRenderers.Length > 0;
+        }
+
+        private void OnPreCull()
+        {
+            if (!_hideDepth || !FF9DepthVRFieldRenderer.CompareEnabled || _depthRenderers == null)
+                return;
+
+            RestoreSavedStates();
+            for (Int32 i = 0; i < _depthRenderers.Length; i++)
+            {
+                Renderer renderer = _depthRenderers[i];
+                if (renderer == null)
+                    continue;
+
+                _savedStates[renderer] = renderer.enabled;
+                renderer.enabled = false;
+            }
+        }
+
+        private void OnPostRender()
+        {
+            RestoreSavedStates();
+        }
+
+        private void OnDisable()
+        {
+            RestoreSavedStates();
+        }
+
+        private void RestoreSavedStates()
+        {
+            if (_savedStates.Count == 0)
+                return;
+
+            foreach (KeyValuePair<Renderer, Boolean> pair in _savedStates)
+            {
+                if (pair.Key != null)
+                    pair.Key.enabled = pair.Value;
+            }
+            _savedStates.Clear();
+        }
+    }
+
     public sealed class FF9DepthVRSbsStereo : MonoBehaviour
     {
         private global::FieldMap _fieldMap;
@@ -2455,6 +2683,7 @@ namespace Memoria.FF9DepthVR
             // A physical right-eye offset exposes unmatted depth holes in the original field art.
             _rightCamera.transform.position = _mainCamera.transform.position;
             _rightCamera.transform.rotation = _mainCamera.transform.rotation;
+            SyncCompareCullers();
         }
 
         private Single SbsEyeAspect()
@@ -2466,6 +2695,7 @@ namespace Memoria.FF9DepthVR
 
         private void RestoreMainCamera()
         {
+            DisableCompareCull(_mainCamera);
             if (_mainCamera != null)
             {
                 _mainCamera.rect = _mainRect;
@@ -2477,8 +2707,37 @@ namespace Memoria.FF9DepthVR
         {
             if (_rightCamera == null)
                 return;
+            DisableCompareCull(_rightCamera);
             Destroy(_rightCamera.gameObject);
             _rightCamera = null;
+        }
+
+        private void SyncCompareCullers()
+        {
+            Renderer[] depthRenderers = FF9DepthVRFieldRenderer.CompareEnabled ? GetComponentsInChildren<Renderer>(true) : null;
+            ConfigureCompareCull(_mainCamera, depthRenderers, FF9DepthVRFieldRenderer.CompareEnabled);
+            ConfigureCompareCull(_rightCamera, null, false);
+        }
+
+        private static void ConfigureCompareCull(Camera camera, Renderer[] depthRenderers, Boolean hideDepth)
+        {
+            if (camera == null)
+                return;
+
+            FF9DepthVRCompareCameraCull cull = camera.GetComponent<FF9DepthVRCompareCameraCull>();
+            if (cull == null)
+                cull = camera.gameObject.AddComponent<FF9DepthVRCompareCameraCull>();
+            cull.Configure(depthRenderers, hideDepth);
+        }
+
+        private static void DisableCompareCull(Camera camera)
+        {
+            if (camera == null)
+                return;
+
+            FF9DepthVRCompareCameraCull cull = camera.GetComponent<FF9DepthVRCompareCameraCull>();
+            if (cull != null)
+                cull.Configure(null, false);
         }
     }
 
@@ -3016,6 +3275,77 @@ namespace Memoria.FF9DepthVR
         }
     }
 
+    public sealed class FF9DepthVRNativeMoviePlaneSbsScaler : MonoBehaviour
+    {
+        private Transform _target;
+        private Vector3 _baseScale = Vector3.one;
+        private Boolean _hasBaseScale;
+        private Boolean _scaled;
+
+        public void Initialize(GameObject nativeMoviePlane)
+        {
+            if (nativeMoviePlane == null)
+                return;
+
+            if (_scaled)
+                RestoreBaseScale();
+
+            _target = nativeMoviePlane.transform;
+            _baseScale = _target.localScale;
+            _hasBaseScale = true;
+            _scaled = false;
+            enabled = true;
+            ApplyScale();
+        }
+
+        private void LateUpdate()
+        {
+            ApplyScale();
+        }
+
+        private void OnDisable()
+        {
+            RestoreBaseScale();
+        }
+
+        private void OnDestroy()
+        {
+            RestoreBaseScale();
+        }
+
+        public void Shutdown()
+        {
+            RestoreBaseScale();
+            enabled = false;
+            Destroy(this);
+        }
+
+        private void ApplyScale()
+        {
+            if (_target == null || !_hasBaseScale)
+                return;
+
+            if (FF9DepthVRFieldRenderer.SbsEnabled)
+            {
+                _target.localScale = new Vector3(_baseScale.x * 0.5f, _baseScale.y, _baseScale.z);
+                _scaled = true;
+            }
+            else
+            {
+                RestoreBaseScale();
+            }
+        }
+
+        private void RestoreBaseScale()
+        {
+            if (_target == null || !_hasBaseScale || !_scaled)
+                return;
+
+            _target.localScale = _baseScale;
+            _scaled = false;
+        }
+    }
+
     public sealed class FF9DepthVRMovieBgPlate : MonoBehaviour
     {
         private const Int32 MovieColumns = 96;
@@ -3041,6 +3371,7 @@ namespace Memoria.FF9DepthVR
         private Boolean _loggedFirstFrame;
         private Boolean _loggedMissingFrames;
         private Boolean _hidNativeMoviePlane;
+        private Boolean _hidFieldDepthReplacement;
         private Boolean _standaloneMode;
         private Boolean _isActive;
 
@@ -3071,6 +3402,7 @@ namespace Memoria.FF9DepthVR
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
             _hidNativeMoviePlane = false;
+            _hidFieldDepthReplacement = false;
             _isActive = true;
             enabled = true;
             Log.Message("[FF9DepthVR] Field movie BGPlate renderer initialized.");
@@ -3101,6 +3433,7 @@ namespace Memoria.FF9DepthVR
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
             _hidNativeMoviePlane = false;
+            _hidFieldDepthReplacement = false;
             _isActive = true;
             enabled = true;
             Log.Message("[FF9DepthVR] Standalone movie BGPlate renderer initialized.");
@@ -3208,6 +3541,7 @@ namespace Memoria.FF9DepthVR
         public void Shutdown()
         {
             RestoreNativeMoviePlane();
+            RestoreFieldDepthReplacement();
             RestoreMovieCameraMask();
             if (_root != null)
             {
@@ -3233,6 +3567,7 @@ namespace Memoria.FF9DepthVR
             _movieCameraOriginalCullingMask = 0;
             _movieMaterial = null;
             _standaloneMode = false;
+            _hidFieldDepthReplacement = false;
             _isActive = false;
             enabled = false;
         }
@@ -3243,6 +3578,7 @@ namespace Memoria.FF9DepthVR
             if (String.IsNullOrEmpty(basePath))
             {
                 LogMissingFramePath("no frame directory for movie=" + movieKey);
+                FallbackToNativeMovie();
                 return false;
             }
 
@@ -3252,6 +3588,7 @@ namespace Memoria.FF9DepthVR
             if (!File.Exists(colorPath) || !File.Exists(depthPath))
             {
                 LogMissingFramePath("missing color/depth frame color=" + colorPath + " depth=" + depthPath);
+                FallbackToNativeMovie();
                 return false;
             }
 
@@ -3263,6 +3600,7 @@ namespace Memoria.FF9DepthVR
                     Destroy(color);
                 if (depth != null)
                     Destroy(depth);
+                FallbackToNativeMovie();
                 return false;
             }
 
@@ -3287,6 +3625,8 @@ namespace Memoria.FF9DepthVR
                 depthScale = FF9DepthVRFieldRenderer.DefaultGeometryDepthScale;
             }
             EnsureRoot(color, depth, width, height);
+            if (_meshRenderer != null)
+                _meshRenderer.enabled = !_standaloneMode;
             Vector3[] vertices;
             Vector2[] uvs;
             Color[] colors;
@@ -3310,7 +3650,10 @@ namespace Memoria.FF9DepthVR
             if (_parallax != null)
                 _parallax.ReplaceSource(_mesh, vertices, colors, width, height, color, depth);
             if (!_standaloneMode)
+            {
+                HideFieldDepthReplacement();
                 HideNativeMoviePlane();
+            }
 
             if (_colorTexture != null)
                 Destroy(_colorTexture);
@@ -3520,6 +3863,17 @@ namespace Memoria.FF9DepthVR
             _hidNativeMoviePlane = true;
         }
 
+        private void ShowNativeMoviePlaneDuringPlayback()
+        {
+            if (_sourceRenderer == null)
+                return;
+
+            _sourceRenderer.enabled = true;
+            if (_hasSourceRendererOriginalScale)
+                _sourceRenderer.transform.localScale = _sourceRendererOriginalScale;
+            _hidNativeMoviePlane = false;
+        }
+
         private void RestoreNativeMoviePlane()
         {
             if (_sourceRenderer != null)
@@ -3529,6 +3883,32 @@ namespace Memoria.FF9DepthVR
                     _sourceRenderer.transform.localScale = _sourceRendererOriginalScale;
             }
             _hidNativeMoviePlane = false;
+        }
+
+        private void HideFieldDepthReplacement()
+        {
+            if (_standaloneMode || _fieldMap == null || _hidFieldDepthReplacement)
+                return;
+
+            FF9DepthVRFieldRenderer.SetDepthReplacementVisible(_fieldMap, false);
+            _hidFieldDepthReplacement = true;
+        }
+
+        private void RestoreFieldDepthReplacement()
+        {
+            if (_standaloneMode || _fieldMap == null || !_hidFieldDepthReplacement)
+                return;
+
+            FF9DepthVRFieldRenderer.SetDepthReplacementVisible(_fieldMap, true);
+            _hidFieldDepthReplacement = false;
+        }
+
+        private void FallbackToNativeMovie()
+        {
+            if (_meshRenderer != null)
+                _meshRenderer.enabled = false;
+            ShowNativeMoviePlaneDuringPlayback();
+            RestoreFieldDepthReplacement();
         }
 
         private void ApplyStandaloneNativeMoviePlaneState()
