@@ -75,3 +75,8 @@ That package keeps source code, scripts, generated depth data, manifests, and JS
 The short-term goal is a playable alpha with stable field and battle SBS support, then full FMV depth playback once the batch render completes. After that, the next major target is VR compatibility testing on real headset hardware.
 
 This is research-heavy modding work, not a finished release. Feedback, screenshots, bug reports, and scene-specific notes are welcome.
+
+## Credits
+
+- Project creator and testing: MiLO83.
+- AI coding collaborator: Cody.

@@ -104,7 +104,7 @@ function topbarMarkup(kind: "main" | "left" | "right") {
         <div class="top-actions">
           <button data-action="prev-scene" type="button" title="Previous background">Prev</button>
           <button data-action="next-scene" type="button" title="Next background">Next</button>
-          <button class="xr-btn" ${kind === "main" ? 'id="xr-btn"' : ""} data-action="vr" type="button" title="Enter VR">VR</button>
+          <button class="xr-btn" ${kind === "main" ? 'id="xr-btn"' : ""} data-action="vr" type="button" title="Enter VR">Enter VR</button>
         </div>
       </div>`;
 }
@@ -540,6 +540,12 @@ function setVrButtonState(text: string, disabled: boolean) {
   xrButtons.forEach((button) => {
     button.textContent = text;
     button.disabled = disabled;
+  });
+}
+
+function setVrButtonActive(active: boolean) {
+  xrButtons.forEach((button) => {
+    button.classList.toggle("active", active);
   });
 }
 
@@ -1434,6 +1440,8 @@ function renderThumbs() {
 }
 
 function resize() {
+  if (state.renderer.xr.isPresenting) return;
+
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   state.camera.aspect = width / Math.max(1, height);
@@ -1510,7 +1518,7 @@ root.addEventListener("click", (event) => {
   } else if (action === "next-scene") {
     void showScene(activeIndex + 1);
   } else if (action === "vr") {
-    void startImmersiveVr(state.renderer, () => setVrButtonState("VR", false));
+    void toggleVr();
   } else if (action === "reset") {
     resetView();
   } else if (action === "view-mode") {
@@ -1546,6 +1554,32 @@ root.addEventListener("click", (event) => {
   }
 });
 
+async function toggleVr() {
+  const session = state.renderer.xr.getSession();
+  if (session) {
+    await session.end();
+    return;
+  }
+
+  setVrButtonState("Starting", true);
+  try {
+    await startImmersiveVr(state.renderer, () => {
+      setVrButtonState("Enter VR", false);
+      setVrButtonActive(false);
+    });
+    sbsMode = "off";
+    setSbsModeButtonState();
+    setViewModeButtonState();
+    setVrButtonState("Exit VR", false);
+    setVrButtonActive(true);
+    resetView();
+  } catch (error) {
+    console.error(error);
+    setVrButtonState(error instanceof Error ? "VR Failed" : "VR Failed", false);
+    window.setTimeout(() => setVrButtonState("Enter VR", false), 1600);
+  }
+}
+
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
@@ -1558,9 +1592,9 @@ window.addEventListener("keyup", (event) => {
   movementKeys.delete(event.key.toLowerCase());
 });
 
-setVrButtonState("VR", true);
+setVrButtonState("Checking VR", true);
 isImmersiveVrSupported().then((supported) => {
-  setVrButtonState(supported ? "VR" : "No VR", !supported);
+  setVrButtonState(supported ? "Enter VR" : "No VR", !supported);
 });
 
 function updateStereoCameras(mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>) {
@@ -1603,11 +1637,18 @@ function renderScene() {
   const renderer = state.renderer;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
+  if (!state.mesh) return;
+
+  if (renderer.xr.isPresenting) {
+    renderer.setScissorTest(false);
+    setRenderMesh(meshForViewMode("depth3d"));
+    renderer.render(state.scene, state.camera);
+    return;
+  }
+
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, width, height);
   renderer.setScissor(0, 0, width, height);
-
-  if (!state.mesh) return;
 
   if (!isSplitMode()) {
     setRenderMesh(meshForViewMode(viewMode));
@@ -1638,16 +1679,18 @@ state.renderer.setAnimationLoop(() => {
   const wiggle = LOCKED_WIGGLE;
   const mesh = state.mesh;
   if (mesh) {
-    const depthViewActive = viewMode === "depth3d" || (isSplitMode() && (leftViewMode === "depth3d" || rightViewMode === "depth3d"));
-    const autoWiggleX = Math.sin(t * 0.9) * 0.035 * wiggle;
-    const autoWiggleY = Math.cos(t * 0.73 + 0.8) * 0.018 * wiggle;
-    const autoWiggleZ = Math.sin(t * 0.57 + 1.35) * 0.12 * wiggle;
+    const xrPresenting = state.renderer.xr.isPresenting;
+    const depthViewActive = xrPresenting || viewMode === "depth3d" || (isSplitMode() && (leftViewMode === "depth3d" || rightViewMode === "depth3d"));
+    const comfortMotion = xrPresenting ? 0 : 1;
+    const autoWiggleX = Math.sin(t * 0.9) * 0.035 * wiggle * comfortMotion;
+    const autoWiggleY = Math.cos(t * 0.73 + 0.8) * 0.018 * wiggle * comfortMotion;
+    const autoWiggleZ = Math.sin(t * 0.57 + 1.35) * 0.12 * wiggle * comfortMotion;
     if (!depthViewActive) {
       mesh.rotation.x += (0 - mesh.rotation.x) * 0.2;
       mesh.rotation.y += (0 - mesh.rotation.y) * 0.2;
     } else {
-      mesh.rotation.y += (targetYaw * wiggle * TILT_MULTIPLIER + autoWiggleX - mesh.rotation.y) * 0.075;
-      mesh.rotation.x += (targetPitch * wiggle * TILT_MULTIPLIER + autoWiggleY - mesh.rotation.x) * 0.075;
+      mesh.rotation.y += (targetYaw * wiggle * TILT_MULTIPLIER * comfortMotion + autoWiggleX - mesh.rotation.y) * 0.075;
+      mesh.rotation.x += (targetPitch * wiggle * TILT_MULTIPLIER * comfortMotion + autoWiggleY - mesh.rotation.x) * 0.075;
     }
     state.camera.position.set(0, 0, BASE_CAMERA_Z + (depthViewActive ? autoWiggleZ : 0));
     state.camera.lookAt(0, 0, 0);
