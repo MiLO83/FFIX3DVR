@@ -10,7 +10,7 @@ The current public package is an alpha test. Field scenes, actors, shadows, dial
 
 Download the latest sanitized alpha from the GitHub releases page:
 
-- [FF9DepthVR 0.2.0 Open Beta 2 (sanitized)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.2)
+- [FF9DepthVR 0.2.0 Open Beta 3 (sanitized)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.3)
 
 The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
 
@@ -22,6 +22,8 @@ The release is intended for testing and feedback. Expect rough edges, scene-spec
 - Battle SBS camera and hand cursor handling.
 - Dialogue/menu duplication for SBS play.
 - Actor, shadow, and small field effect grounding fixes for camera perspective movement.
+- `F7` VR Capture Mode for forcing SBS output for headset desktop/theater capture.
+- Optional localhost UDP head-tracking bridge on port `29710` using `yaw,pitch,roll` degree packets while VR Capture Mode is enabled.
 - `depth-gallery.html` for browsing depth scenes and comparing 2D/3D output in a browser.
 
 ## FMV Status

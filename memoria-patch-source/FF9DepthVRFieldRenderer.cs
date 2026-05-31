@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Assets.Sources.Graphics.Movie;
 using Memoria.Prime;
@@ -36,6 +39,7 @@ namespace Memoria.FF9DepthVR
         private static String _lastLoggedSceneId;
         private static Int32 _lastSbsToggleFrame = -1;
         private static Int32 _lastActorLookToggleFrame = -1;
+        private static Int32 _lastVrCaptureToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
         private static Boolean _movieDebugOverlayEnabled;
         private static FF9DepthVRMovieBgPlate _activeMoviePlate;
@@ -44,9 +48,11 @@ namespace Memoria.FF9DepthVR
         internal static Boolean PlateVisible = true;
         public static DepthViewMode ViewMode = DepthViewMode.Depth;
         public static Boolean SbsEnabled = false;
+        public static Boolean VrCaptureEnabled = false;
         public static Boolean ActorLookEnabled = false;
         public static Boolean WasSbsToggleInputHandledThisFrame => _lastSbsToggleFrame == Time.frameCount;
-        internal static Boolean CompareEnabled => ViewMode == DepthViewMode.Compare;
+        internal static Boolean SbsActive => VrCaptureEnabled || ViewMode != DepthViewMode.Depth;
+        internal static Boolean CompareEnabled => !VrCaptureEnabled && ViewMode == DepthViewMode.Compare;
         internal static Boolean MovieDebugOverlayEnabled => _movieDebugOverlayEnabled;
         internal static Boolean MoviePlateActive => _activeMoviePlate != null && _activeMoviePlate.IsActive;
         internal static Boolean IsMbgPlaybackActive()
@@ -76,14 +82,38 @@ namespace Memoria.FF9DepthVR
         public static Boolean TryHandleSbsToggleInput()
         {
             Boolean actorLookHandled = TryHandleActorLookToggleInput();
+            Boolean vrCaptureHandled = TryHandleVrCaptureToggleInput();
             if (!Input.GetKeyDown(KeyCode.F9) || _lastSbsToggleFrame == Time.frameCount)
-                return actorLookHandled;
+                return actorLookHandled || vrCaptureHandled;
 
             _lastSbsToggleFrame = Time.frameCount;
             ViewMode = ViewMode == DepthViewMode.Depth ? DepthViewMode.Stereo3D : ViewMode == DepthViewMode.Stereo3D ? DepthViewMode.Compare : DepthViewMode.Depth;
-            SbsEnabled = ViewMode != DepthViewMode.Depth;
+            ApplySbsState();
             Log.Message("[FF9DepthVR] View mode = " + ViewMode + " (F9)");
             return true;
+        }
+
+        public static Boolean TryHandleVrCaptureToggleInput()
+        {
+            if (!Input.GetKeyDown(KeyCode.F7) || _lastVrCaptureToggleFrame == Time.frameCount)
+                return false;
+
+            _lastVrCaptureToggleFrame = Time.frameCount;
+            VrCaptureEnabled = !VrCaptureEnabled;
+            ApplySbsState();
+            Log.Message("[FF9DepthVR] VR capture mode enabled = " + VrCaptureEnabled + " (F7)");
+            return true;
+        }
+
+        private static void ApplySbsState()
+        {
+            SbsEnabled = VrCaptureEnabled || ViewMode != DepthViewMode.Depth;
+        }
+
+        internal static Boolean TryReadHeadTrackLook(out Vector2 look)
+        {
+            look = Vector2.zero;
+            return VrCaptureEnabled && FF9DepthVRHeadTrackingBridge.TryReadLook(out look);
         }
 
         public static Boolean TryHandleActorLookToggleInput()
@@ -106,7 +136,7 @@ namespace Memoria.FF9DepthVR
         public static Boolean TryWorldToSbsUiScreenPoint(Camera worldCamera, Vector3 worldPosition, out Vector3 screenPosition)
         {
             screenPosition = Vector3.zero;
-            if (!SbsEnabled || worldCamera == null || Screen.width <= 1 || Screen.height <= 0)
+            if (!SbsActive || worldCamera == null || Screen.width <= 1 || Screen.height <= 0)
                 return false;
 
             if (FF9DepthVRBattleStereo.TryProjectSbsUiPoint(worldCamera, worldPosition, out screenPosition))
@@ -1043,6 +1073,165 @@ namespace Memoria.FF9DepthVR
         }
     }
 
+    internal static class FF9DepthVRHeadTrackingBridge
+    {
+        private const Int32 Port = 29710;
+        private const Single StaleSeconds = 0.35f;
+        private const Single YawDegreesForFullLook = 25f;
+        private const Single PitchDegreesForFullLook = 18f;
+        private static UdpClient _client;
+        private static Boolean _unavailable;
+        private static Boolean _loggedFirstPacket;
+        private static Int32 _lastPumpFrame = -1;
+        private static Single _lastPacketTime = -999f;
+        private static Vector2 _look;
+
+        public static Boolean TryReadLook(out Vector2 look)
+        {
+            look = Vector2.zero;
+            Pump();
+            if (Time.realtimeSinceStartup - _lastPacketTime > StaleSeconds)
+                return false;
+
+            look = _look;
+            return true;
+        }
+
+        private static void Pump()
+        {
+            if (_lastPumpFrame == Time.frameCount)
+                return;
+            _lastPumpFrame = Time.frameCount;
+
+            EnsureClient();
+            if (_client == null)
+                return;
+
+            try
+            {
+                while (_client.Available > 0)
+                {
+                    IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                    Byte[] data = _client.Receive(ref remote);
+                    Single yaw;
+                    Single pitch;
+                    Single roll;
+                    if (!TryParsePacket(Encoding.ASCII.GetString(data), out yaw, out pitch, out roll))
+                        continue;
+
+                    _look = new Vector2(
+                        Mathf.Clamp(yaw / YawDegreesForFullLook, -1f, 1f),
+                        Mathf.Clamp(pitch / PitchDegreesForFullLook, -1f, 1f)
+                    );
+                    _lastPacketTime = Time.realtimeSinceStartup;
+                    if (!_loggedFirstPacket)
+                    {
+                        _loggedFirstPacket = true;
+                        Log.Message("[FF9DepthVR] Head tracking UDP bridge received first packet yaw=" + yaw.ToString("0.###") + " pitch=" + pitch.ToString("0.###") + " roll=" + roll.ToString("0.###"));
+                    }
+                }
+            }
+            catch (SocketException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Log.Message("[FF9DepthVR] Head tracking UDP bridge read failed: " + ex.Message);
+            }
+        }
+
+        private static void EnsureClient()
+        {
+            if (_client != null || _unavailable)
+                return;
+
+            try
+            {
+                _client = new UdpClient(Port);
+                _client.Client.Blocking = false;
+                Log.Message("[FF9DepthVR] Head tracking UDP bridge listening on 127.0.0.1:" + Port + " (yaw,pitch,roll degrees).");
+            }
+            catch (Exception ex)
+            {
+                _unavailable = true;
+                Log.Message("[FF9DepthVR] Head tracking UDP bridge unavailable: " + ex.Message);
+            }
+        }
+
+        private static Boolean TryParsePacket(String payload, out Single yaw, out Single pitch, out Single roll)
+        {
+            yaw = 0f;
+            pitch = 0f;
+            roll = 0f;
+            if (String.IsNullOrEmpty(payload))
+                return false;
+
+            String[] tokens = payload.Trim()
+                .Replace(';', ',')
+                .Replace(' ', ',')
+                .Split(new Char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            Int32 ordered = 0;
+            Boolean foundYaw = false;
+            Boolean foundPitch = false;
+            for (Int32 i = 0; i < tokens.Length; i++)
+            {
+                String token = tokens[i].Trim();
+                if (String.IsNullOrEmpty(token))
+                    continue;
+
+                Int32 equals = token.IndexOf('=');
+                if (equals > 0)
+                {
+                    String key = token.Substring(0, equals).Trim().ToLowerInvariant();
+                    Single value;
+                    if (!TryParseFloat(token.Substring(equals + 1), out value))
+                        continue;
+                    if (key == "yaw" || key == "y")
+                    {
+                        yaw = value;
+                        foundYaw = true;
+                    }
+                    else if (key == "pitch" || key == "p")
+                    {
+                        pitch = value;
+                        foundPitch = true;
+                    }
+                    else if (key == "roll" || key == "r")
+                    {
+                        roll = value;
+                    }
+                    continue;
+                }
+
+                Single parsed;
+                if (!TryParseFloat(token, out parsed))
+                    continue;
+                if (ordered == 0)
+                {
+                    yaw = parsed;
+                    foundYaw = true;
+                }
+                else if (ordered == 1)
+                {
+                    pitch = parsed;
+                    foundPitch = true;
+                }
+                else if (ordered == 2)
+                {
+                    roll = parsed;
+                }
+                ordered++;
+            }
+
+            return foundYaw || foundPitch;
+        }
+
+        private static Boolean TryParseFloat(String text, out Single value)
+        {
+            return Single.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+    }
+
     public sealed class FF9DepthVRParallax : MonoBehaviour
     {
         private Mesh _mesh;
@@ -1153,7 +1342,7 @@ namespace Memoria.FF9DepthVR
             {
                 Vector2 look = CameraLookNormalized();
                 _lookFocusUv = new Vector2(look.x * 0.5f + 0.5f, look.y * 0.5f + 0.5f);
-                Single xMultiplier = FF9DepthVRFieldRenderer.SbsEnabled ? FF9DepthVRFieldRenderer.ViewAngleXMultiplier : 1f;
+                Single xMultiplier = FF9DepthVRFieldRenderer.SbsActive ? FF9DepthVRFieldRenderer.ViewAngleXMultiplier : 1f;
                 targetX = look.x * FF9DepthVRFieldRenderer.ViewAngleMultiplier * xMultiplier;
                 targetY = look.y * FF9DepthVRFieldRenderer.ViewAngleMultiplier;
             }
@@ -1380,10 +1569,23 @@ namespace Memoria.FF9DepthVR
 
         private Vector2 AddActorLookBaseline(Vector2 manualLook)
         {
+            manualLook = AddHeadTrackLook(manualLook);
             Vector2 actorLook = ActorLookBaselineNormalized();
             return new Vector2(
                 Mathf.Clamp(manualLook.x + actorLook.x, -1f, 1f),
                 Mathf.Clamp(manualLook.y + actorLook.y, -1f, 1f)
+            );
+        }
+
+        private Vector2 AddHeadTrackLook(Vector2 manualLook)
+        {
+            Vector2 headLook;
+            if (!FF9DepthVRFieldRenderer.TryReadHeadTrackLook(out headLook))
+                return manualLook;
+
+            return new Vector2(
+                Mathf.Clamp(manualLook.x + headLook.x, -1f, 1f),
+                Mathf.Clamp(manualLook.y + headLook.y, -1f, 1f)
             );
         }
 
@@ -2634,7 +2836,7 @@ namespace Memoria.FF9DepthVR
 
         private void ApplyState(Boolean force)
         {
-            Boolean enabled = FF9DepthVRFieldRenderer.SbsEnabled;
+            Boolean enabled = FF9DepthVRFieldRenderer.SbsActive;
             if (_mainCamera == null)
                 return;
 
@@ -2771,7 +2973,7 @@ namespace Memoria.FF9DepthVR
         internal static Boolean TryProjectSbsUiPoint(Camera sourceCamera, Vector3 worldPosition, out Vector3 screenPosition)
         {
             screenPosition = Vector3.zero;
-            if (!FF9DepthVRFieldRenderer.SbsEnabled || sourceCamera == null || Screen.width <= 1 || Screen.height <= 0)
+            if (!FF9DepthVRFieldRenderer.SbsActive || sourceCamera == null || Screen.width <= 1 || Screen.height <= 0)
                 return false;
 
             FF9DepthVRBattleStereo stereo;
@@ -2822,7 +3024,7 @@ namespace Memoria.FF9DepthVR
                 return;
             RegisterInstance();
 
-            Boolean enabled = FF9DepthVRFieldRenderer.SbsEnabled && IsBattleScene();
+            Boolean enabled = FF9DepthVRFieldRenderer.SbsActive && IsBattleScene();
             if (enabled)
             {
                 EnsureRightCamera();
@@ -3024,7 +3226,7 @@ namespace Memoria.FF9DepthVR
 
         internal static Single GetRenderAspect(Camera camera)
         {
-            if (FF9DepthVRFieldRenderer.SbsEnabled && Screen.width > 0 && Screen.height > 0)
+            if (FF9DepthVRFieldRenderer.SbsActive && Screen.width > 0 && Screen.height > 0)
                 return (Screen.width * 0.5f) / Screen.height;
             if (camera != null && camera.aspect > 0f)
                 return camera.aspect;
@@ -3111,7 +3313,7 @@ namespace Memoria.FF9DepthVR
                 RestoreMainCamera();
             CaptureBasePose();
 
-            Boolean enabled = FF9DepthVRFieldRenderer.SbsEnabled;
+            Boolean enabled = FF9DepthVRFieldRenderer.SbsActive;
             if (enabled)
             {
                 if (_mainCameraWasEnabled == false)
@@ -3325,7 +3527,7 @@ namespace Memoria.FF9DepthVR
             if (_target == null || !_hasBaseScale)
                 return;
 
-            if (FF9DepthVRFieldRenderer.SbsEnabled)
+            if (FF9DepthVRFieldRenderer.SbsActive)
             {
                 _target.localScale = new Vector3(_baseScale.x * 0.5f, _baseScale.y, _baseScale.z);
                 _scaled = true;
@@ -3492,7 +3694,8 @@ namespace Memoria.FF9DepthVR
             StringBuilder sb = new StringBuilder(2048);
             sb.AppendLine("FF9DepthVR FMV Debug (F10)");
             sb.Append("screen=").Append(Screen.width).Append("x").Append(Screen.height)
-                .Append(" sbs=").Append(FF9DepthVRFieldRenderer.SbsEnabled)
+                .Append(" sbs=").Append(FF9DepthVRFieldRenderer.SbsActive)
+                .Append(" vr=").Append(FF9DepthVRFieldRenderer.VrCaptureEnabled)
                 .Append(" standalone=").Append(_standaloneMode)
                 .Append(" active=").Append(_isActive)
                 .AppendLine();
@@ -3682,7 +3885,7 @@ namespace Memoria.FF9DepthVR
             Single viewWidth = viewHeight * Mathf.Max(0.01f, viewAspect);
             Single videoAspect = color != null && color.height > 0 ? (Single)color.width / color.height : 4f / 3f;
 
-            if (FF9DepthVRFieldRenderer.SbsEnabled)
+            if (FF9DepthVRFieldRenderer.SbsActive)
             {
                 width = viewWidth;
                 height = viewHeight;
@@ -3916,7 +4119,7 @@ namespace Memoria.FF9DepthVR
             if (!_standaloneMode || _sourceRenderer == null)
                 return;
 
-            if (FF9DepthVRFieldRenderer.SbsEnabled)
+            if (FF9DepthVRFieldRenderer.SbsActive)
             {
                 _sourceRenderer.enabled = true;
                 if (_hasSourceRendererOriginalScale)
@@ -4042,7 +4245,7 @@ namespace Memoria.FF9DepthVR
 
         private void ApplyState(Boolean force)
         {
-            Boolean enabled = FF9DepthVRFieldRenderer.SbsEnabled;
+            Boolean enabled = FF9DepthVRFieldRenderer.SbsActive;
             if (enabled)
             {
                 DiscoverUiCameras();
@@ -4163,7 +4366,7 @@ namespace Memoria.FF9DepthVR
             {
                 _logTimer = 5f;
                 FieldMapActor[] actors = UnityEngine.Object.FindObjectsOfType<FieldMapActor>();
-                Log.Message("[FF9DepthVR] Diagnostics actors=" + actors.Length + " plateVisible=" + FF9DepthVRFieldRenderer.PlateVisible + " sbs=" + FF9DepthVRFieldRenderer.SbsEnabled);
+                Log.Message("[FF9DepthVR] Diagnostics actors=" + actors.Length + " plateVisible=" + FF9DepthVRFieldRenderer.PlateVisible + " sbs=" + FF9DepthVRFieldRenderer.SbsActive + " vr=" + FF9DepthVRFieldRenderer.VrCaptureEnabled);
             }
         }
 
