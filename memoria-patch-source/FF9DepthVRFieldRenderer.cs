@@ -77,7 +77,7 @@ namespace Memoria.FF9DepthVR
         internal static Single DefaultIdleParallaxStrength => _defaults.IdleParallaxStrength;
         internal static Single MoviePlateDistance => 2f;
         internal static Single MovieStandaloneDepthScale => 0.35f;
-        private static readonly Boolean EnableFieldMovieDepthPlate = false;
+        private static readonly Boolean EnableFieldMovieDepthPlate = true;
 
         public static Boolean TryHandleSbsToggleInput()
         {
@@ -169,9 +169,16 @@ namespace Memoria.FF9DepthVR
                 BeginNativeMoviePlaneSbs(nativeMoviePlane);
                 return;
             }
+            String movieDepthReason;
+            if (!HasUsableMovieDepthFrames(movieMaterial, out movieDepthReason))
+            {
+                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Field movie BGPlate fallback", movieDepthReason);
+                return;
+            }
             if (!HasDepthReplacement(fieldMap))
             {
                 Log.Message("[FF9DepthVR] Field movie BGPlate skipped: no active field depth BGPlate for movie=" + movieMaterial.movieKey + ".");
+                BeginNativeMoviePlaneSbs(nativeMoviePlane);
                 return;
             }
 
@@ -203,6 +210,13 @@ namespace Memoria.FF9DepthVR
             if (movieCamera == null)
             {
                 Log.Message("[FF9DepthVR] Movie BGPlate skipped: no movie camera for movie=" + movieMaterial.movieKey + ".");
+                return;
+            }
+
+            String movieDepthReason;
+            if (!HasUsableMovieDepthFrames(movieMaterial, out movieDepthReason))
+            {
+                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Standalone movie BGPlate fallback", movieDepthReason);
                 return;
             }
 
@@ -262,6 +276,16 @@ namespace Memoria.FF9DepthVR
             scaler.Initialize(nativeMoviePlane);
         }
 
+        private static void BeginNativeMovieFallback(MovieMaterial movieMaterial, GameObject nativeMoviePlane, String context, String reason)
+        {
+            if (_activeMoviePlate != null)
+                EndFieldMoviePlate(_activeMovieFieldMap);
+
+            String movieKey = movieMaterial != null ? movieMaterial.movieKey : "unknown";
+            Log.Message("[FF9DepthVR] " + context + ": native 2D movie remains active for movie=" + movieKey + " reason=" + reason + ".");
+            BeginNativeMoviePlaneSbs(nativeMoviePlane);
+        }
+
         private static void EndNativeMoviePlaneSbs()
         {
             if (_activeNativeMoviePlaneScaler == null)
@@ -269,6 +293,147 @@ namespace Memoria.FF9DepthVR
 
             _activeNativeMoviePlaneScaler.Shutdown();
             _activeNativeMoviePlaneScaler = null;
+        }
+
+        internal static Boolean TryResolveMovieFrameDirectory(String movieKey, out String basePath)
+        {
+            basePath = null;
+            if (String.IsNullOrEmpty(movieKey))
+                return false;
+
+            String relative = Path.Combine(Path.Combine(Path.Combine("Data", "FF9DepthVR"), "fmv-depth"), movieKey);
+            String streaming = Path.Combine(Application.streamingAssetsPath, relative);
+            if (Directory.Exists(streaming))
+            {
+                basePath = streaming;
+                return true;
+            }
+
+            String local = Path.Combine("C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth", movieKey);
+            if (Directory.Exists(local))
+            {
+                basePath = local;
+                return true;
+            }
+
+            return false;
+        }
+
+        internal static Boolean HasUsableMovieDepthFrames(MovieMaterial movieMaterial, out String reason)
+        {
+            reason = "missing movie material";
+            if (movieMaterial == null)
+                return false;
+
+            String movieKey = movieMaterial.movieKey;
+            if (String.IsNullOrEmpty(movieKey))
+            {
+                reason = "missing movie key";
+                return false;
+            }
+
+            String basePath;
+            if (!TryResolveMovieFrameDirectory(movieKey, out basePath))
+            {
+                reason = "no fmv-depth directory";
+                return false;
+            }
+
+            return HasUsableMovieDepthFrames(movieKey, basePath, out reason);
+        }
+
+        internal static Boolean HasUsableMovieDepthFrames(String movieKey, String basePath, out String reason)
+        {
+            reason = "missing movie depth directory";
+            if (String.IsNullOrEmpty(movieKey) || String.IsNullOrEmpty(basePath))
+                return false;
+
+            String colorDir = Path.Combine(basePath, "color_frames");
+            String depthDir = Path.Combine(basePath, "depth_frames");
+            if (!Directory.Exists(colorDir))
+            {
+                reason = "missing color_frames directory";
+                return false;
+            }
+            if (!Directory.Exists(depthDir))
+            {
+                reason = "missing depth_frames directory";
+                return false;
+            }
+
+            String firstFrame = "frame_000001.png";
+            if (!File.Exists(Path.Combine(colorDir, firstFrame)))
+            {
+                reason = "missing first color frame";
+                return false;
+            }
+            if (!File.Exists(Path.Combine(depthDir, firstFrame)))
+            {
+                reason = "missing first depth frame";
+                return false;
+            }
+
+            String progressPath = Path.Combine(basePath, "progress.json");
+            if (File.Exists(progressPath))
+                return HasCompleteMovieDepthProgress(movieKey, colorDir, depthDir, progressPath, out reason);
+
+            reason = "usable frames without progress metadata at " + basePath;
+            return true;
+        }
+
+        private static Boolean HasCompleteMovieDepthProgress(String movieKey, String colorDir, String depthDir, String progressPath, out String reason)
+        {
+            try
+            {
+                JSONNode progress = JSONNode.Parse(File.ReadAllText(progressPath));
+                String status = progress["status"].Value;
+                Int32 frames = progress["frames"].AsInt;
+                if (frames <= 0)
+                    frames = progress["totalFrames"].AsInt;
+                Int32 done = progress["done"].AsInt;
+                Int32 failed = progress["failed"].AsInt;
+
+                if (!String.Equals(status, "complete", StringComparison.OrdinalIgnoreCase))
+                {
+                    reason = "progress status=" + status;
+                    return false;
+                }
+                if (failed > 0)
+                {
+                    reason = "progress failed frames=" + failed;
+                    return false;
+                }
+                if (frames <= 0)
+                {
+                    reason = "progress has no frame count";
+                    return false;
+                }
+                if (done < frames)
+                {
+                    reason = "progress done=" + done + "/" + frames;
+                    return false;
+                }
+
+                String lastFrame = "frame_" + frames.ToString("D6") + ".png";
+                if (!File.Exists(Path.Combine(colorDir, lastFrame)))
+                {
+                    reason = "missing final color frame " + lastFrame;
+                    return false;
+                }
+                if (!File.Exists(Path.Combine(depthDir, lastFrame)))
+                {
+                    reason = "missing final depth frame " + lastFrame;
+                    return false;
+                }
+
+                reason = "complete depth frames for movie=" + movieKey + " frames=" + frames;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = "invalid progress metadata: " + ex.Message;
+                return false;
+            }
         }
 
         internal static void ApplyActorCameraScroll(global::FieldMap fieldMap)
@@ -4045,16 +4210,8 @@ namespace Memoria.FF9DepthVR
 
         private static String ResolveMovieFrameDirectory(String movieKey)
         {
-            String relative = Path.Combine(Path.Combine(Path.Combine("Data", "FF9DepthVR"), "fmv-depth"), movieKey);
-            String streaming = Path.Combine(Application.streamingAssetsPath, relative);
-            if (Directory.Exists(streaming))
-                return streaming;
-
-            String local = Path.Combine("C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth", movieKey);
-            if (Directory.Exists(local))
-                return local;
-
-            return null;
+            String basePath;
+            return FF9DepthVRFieldRenderer.TryResolveMovieFrameDirectory(movieKey, out basePath) ? basePath : null;
         }
 
         private void HideNativeMoviePlane()

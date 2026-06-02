@@ -92,10 +92,29 @@ for (const job of completeJobs) {
     job.erpOutput;
   const erp = path.join(repoRoot, erpRel);
   const splat = path.join(repoRoot, job.splatOutput);
+  const triposplatRel = job.runtimeAssets?.highPowerTripoSplat?.path || job.triposplat?.ply;
+  const triposplatPreparedRel = job.triposplat?.prepared;
+  const triposplat = triposplatRel ? path.join(repoRoot, triposplatRel) : "";
+  const triposplatPrepared = triposplatPreparedRel ? path.join(repoRoot, triposplatPreparedRel) : "";
 
   await copyFile(sourcePlate, path.join(outDir, "source_plate.png"));
   await copyFile(erp, path.join(outDir, "field_erp.png"));
   await copyFile(splat, path.join(outDir, "field_spherical_env.ply"));
+  let triposplatStat = null;
+  let triposplatPreparedUrl = undefined;
+  if (triposplat) {
+    try {
+      await copyFile(triposplat, path.join(outDir, "field_triposplat.ply"));
+      triposplatStat = await stat(triposplat);
+      if (triposplatPrepared) {
+        await copyFile(triposplatPrepared, path.join(outDir, "field_triposplat_preprocessed.webp"));
+        triposplatPreparedUrl = `/assets/maps/${id}/field_triposplat_preprocessed.webp`;
+      }
+    } catch {
+      triposplatStat = null;
+      triposplatPreparedUrl = undefined;
+    }
+  }
 
   const erpStat = await stat(erp);
   const splatStat = await stat(splat);
@@ -132,6 +151,16 @@ for (const job of completeJobs) {
       variant: "spherical_env",
       vertices: job.runtimeAssets?.highPower?.vertices ?? 131072,
     },
+    triposplat: triposplatStat
+      ? {
+          url: `/assets/maps/${id}/field_triposplat.ply`,
+          bytes: triposplatStat.size,
+          type: "gaussian_splat_ply",
+          variant: job.runtimeAssets?.highPowerTripoSplat?.variant ?? "triposplat_scene_plate",
+          vertices: job.runtimeAssets?.highPowerTripoSplat?.vertices ?? job.triposplat?.numGaussians ?? 131072,
+          preparedUrl: triposplatPreparedUrl,
+        }
+      : undefined,
     sourcePlate: {
       url: `/assets/maps/${id}/source_plate.png`,
       bytes: sourceStat.size,

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FFIX3DVR - Stock Memoria Comparison</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #0b0d10;
+        color: #e9edf4;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(74, 133, 255, 0.18), transparent 28rem),
+          linear-gradient(180deg, #121820 0, #0b0d10 28rem);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(30px, 5vw, 56px);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0;
+        max-width: 760px;
+        color: #b9c4d6;
+        line-height: 1.55;
+      }
+
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      a {
+        color: #9dc2ff;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid rgba(157, 194, 255, 0.28);
+        border-radius: 8px;
+        background: rgba(157, 194, 255, 0.1);
+        color: #dbe8ff;
+        text-decoration: none;
+        font-size: 14px;
+      }
+
+      #doc {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 52vh;
+        overflow-x: auto;
+        padding: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 8px;
+        background: rgba(5, 7, 10, 0.78);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+        color: #eef3fb;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font:
+          14px/1.55 "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono",
+          monospace;
+      }
+
+      .status {
+        padding: 24px;
+        color: #b9c4d6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Memoria Comparison</h1>
+          <p>
+            Stock Memoria vs FFIX3DVR annotated review notes: what changed, why it changed,
+            and how the alpha patch is applied.
+          </p>
+        </div>
+        <nav>
+          <a class="button" href="/depth-gallery.html">Depth Gallery</a>
+          <a class="button" href="/docs/memoria-stock-vs-ffix3dvr-annotated-comparison.md">Raw Markdown</a>
+          <a class="button" href="https://github.com/MiLO83/FFIX3DVR">GitHub</a>
+        </nav>
+      </header>
+      <pre id="doc" class="status">Loading comparison notes...</pre>
+    </main>
+    <script>
+      const doc = document.getElementById("doc");
+      fetch("/docs/memoria-stock-vs-ffix3dvr-annotated-comparison.md", { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.text();
+        })
+        .then((text) => {
+          doc.className = "";
+          doc.textContent = text;
+        })
+        .catch((error) => {
+          doc.textContent = `Unable to load comparison notes: ${error.message}`;
+        });
+    </script>
+  </body>
+</html>

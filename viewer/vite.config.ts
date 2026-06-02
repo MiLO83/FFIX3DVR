@@ -259,6 +259,7 @@ export default defineConfig({
       input: {
         app: path.resolve(__dirname, "index.html"),
         depthGallery: path.resolve(__dirname, "depth-gallery.html"),
+        depthPreview: path.resolve(__dirname, "depth-preview.html"),
       },
     },
     target: "es2022",

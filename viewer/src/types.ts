@@ -17,6 +17,14 @@ export type SceneAsset = {
     variant: string;
     vertices: number;
   };
+  triposplat?: {
+    url: string;
+    bytes: number;
+    type: "gaussian_splat_ply";
+    variant: string;
+    vertices: number;
+    preparedUrl?: string;
+  };
   sourcePlate: {
     url: string;
     bytes: number;
