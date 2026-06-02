@@ -80,9 +80,13 @@ if (Test-Path $modFileList) {
         Set-Content -Path $modFileList -Encoding UTF8
 }
 
+$fmvDepthSrc = Join-Path $root "artifacts\fmv-depth"
+$fmvDepthDst = Join-Path $modDst "StreamingAssets\Data\FF9DepthVR\fmv-depth"
+Copy-Directory $fmvDepthSrc $fmvDepthDst @("color_frames", "depth_frames") @("frame_*.png", "*.tmp")
+
 $patchDst = Join-Path $stage "memoria-patch-source"
 New-Item -ItemType Directory -Force -Path $patchDst | Out-Null
-Copy-Item -LiteralPath (Join-Path $root ".memoria-src\Assembly-CSharp\Memoria\FF9DepthVR\FF9DepthVRFieldRenderer.cs") -Destination $patchDst -Force
+Copy-Item -LiteralPath (Join-Path $root "memoria-patch-source\FF9DepthVRFieldRenderer.cs") -Destination $patchDst -Force
 
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -CompressionLevel Optimal
 
@@ -92,6 +96,8 @@ $bad = Get-ChildItem -Path $stage -Recurse -File -ErrorAction SilentlyContinue |
         $relative = ([System.IO.Path]::GetFullPath($_.FullName) -replace "^$stageFull", "")
         ($relative -match "viewer\\public\\assets\\(originals|maps)\\") -or
         ($relative -match "artifacts\\all-fields\\(source|debug|erp|erp_|splat|splat_)\\") -or
+        ($relative -match "artifacts\\memoria-mod\\.*fmv-depth\\.*\\(color_frames|depth_frames)\\") -or
+        ($relative -match "artifacts\\memoria-mod\\.*fmv-depth\\.*frame_\d+\.png$") -or
         ($relative -match "artifacts\\memoria-mod\\.*(source_plate|field_erp).*\.(png|jpg|jpeg|webp)$") -or
         ($relative -match "viewer\\public\\assets\\.*(source_plate|field_erp).*\.(png|jpg|jpeg|webp)$") -or
         ($relative -match "\.(ply|ksplat|splat)$")

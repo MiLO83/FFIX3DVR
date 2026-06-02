@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using Assets.Sources.Graphics.Movie;
 using Memoria.Prime;
@@ -26,7 +27,7 @@ namespace Memoria.FF9DepthVR
         private const String ManifestPath = "Data/FF9DepthVR/manifest.json";
         internal const String RootName = "FF9DepthVR_Background";
         private const Single DepthUnitScale = 32f;
-        private const Int32 ReplacementPlateRenderQueue = 2998;
+        internal const Int32 ReplacementPlateRenderQueue = 2998;
         internal const Single ViewAngleMultiplier = 3f;
         internal const Single ViewAngleXMultiplier = 2f;
 
@@ -295,28 +296,164 @@ namespace Memoria.FF9DepthVR
             _activeNativeMoviePlaneScaler = null;
         }
 
+        internal sealed class MovieFrameSet
+        {
+            public String MovieKey;
+            public String RootPath;
+            public String ColorFramesDirectory;
+            public String DepthFramesDirectory;
+            public String DepthMoviePath;
+            public String ProgressPath;
+        }
+
         internal static Boolean TryResolveMovieFrameDirectory(String movieKey, out String basePath)
         {
+            MovieFrameSet frameSet;
+            String reason;
+            if (TryResolveMovieFrameSet(movieKey, out frameSet, out reason))
+            {
+                basePath = frameSet.RootPath;
+                return true;
+            }
+
             basePath = null;
+            return false;
+        }
+
+        internal static Boolean TryResolveMovieFrameSet(String movieKey, out MovieFrameSet frameSet, out String reason)
+        {
+            frameSet = null;
+            reason = "missing movie key";
             if (String.IsNullOrEmpty(movieKey))
                 return false;
 
+            List<String> roots = GetMovieFrameRootCandidates(movieKey);
+            if (roots.Count == 0)
+            {
+                reason = "no fmv-depth search roots";
+                return false;
+            }
+
+            String colorRoot = null;
+            String depthRoot = null;
+            String depthMovieRoot = null;
+            String depthMoviePath = null;
+            foreach (String root in roots)
+            {
+                String candidate = Path.Combine(root, movieKey + "_depth.bytes");
+                if (File.Exists(candidate))
+                {
+                    depthMovieRoot = root;
+                    depthMoviePath = candidate;
+                    break;
+                }
+            }
+
+            foreach (String root in roots)
+            {
+                if (Directory.Exists(Path.Combine(root, "color_frames")) && Directory.Exists(Path.Combine(root, "depth_frames")))
+                {
+                    colorRoot = root;
+                    depthRoot = root;
+                    break;
+                }
+            }
+
+            if (depthRoot == null)
+            {
+                foreach (String root in roots)
+                {
+                    if (Directory.Exists(Path.Combine(root, "depth_frames")))
+                    {
+                        depthRoot = root;
+                        break;
+                    }
+                }
+            }
+
+            if (colorRoot == null)
+            {
+                foreach (String root in roots)
+                {
+                    if (Directory.Exists(Path.Combine(root, "color_frames")))
+                    {
+                        colorRoot = root;
+                        break;
+                    }
+                }
+            }
+
+            if (depthRoot == null && depthMoviePath == null)
+            {
+                reason = "missing depth movie bytes or depth_frames directory";
+                return false;
+            }
+            if (depthMoviePath == null && colorRoot == null)
+            {
+                reason = "missing user color_frames directory";
+                return false;
+            }
+
+            String rootPath = depthRoot != null ? depthRoot : depthMovieRoot;
+            frameSet = new MovieFrameSet
+            {
+                MovieKey = movieKey,
+                RootPath = rootPath,
+                ColorFramesDirectory = colorRoot != null ? Path.Combine(colorRoot, "color_frames") : null,
+                DepthFramesDirectory = depthRoot != null ? Path.Combine(depthRoot, "depth_frames") : null,
+                DepthMoviePath = depthMoviePath,
+                ProgressPath = Path.Combine(rootPath, "progress.json")
+            };
+            reason = depthMoviePath != null
+                ? "depthMovie=" + frameSet.DepthMoviePath
+                : "color=" + frameSet.ColorFramesDirectory + " depth=" + frameSet.DepthFramesDirectory;
+            return true;
+        }
+
+        private static List<String> GetMovieFrameRootCandidates(String movieKey)
+        {
+            List<String> roots = new List<String>();
             String relative = Path.Combine(Path.Combine(Path.Combine("Data", "FF9DepthVR"), "fmv-depth"), movieKey);
-            String streaming = Path.Combine(Application.streamingAssetsPath, relative);
-            if (Directory.Exists(streaming))
+            AddUniquePath(roots, Path.Combine(Application.streamingAssetsPath, relative));
+
+            String gameRoot = TryGetGameRootPath();
+            if (!String.IsNullOrEmpty(gameRoot))
             {
-                basePath = streaming;
-                return true;
+                AddUniquePath(roots, Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(gameRoot, "FF9DepthVR"), "StreamingAssets"), "Data"), "FF9DepthVR"), Path.Combine("fmv-depth", movieKey)));
+                AddUniquePath(roots, Path.Combine(Path.Combine(Path.Combine(gameRoot, "FF9DepthVR"), "UserAssets"), Path.Combine("fmv-depth", movieKey)));
             }
 
-            String local = Path.Combine("C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth", movieKey);
-            if (Directory.Exists(local))
-            {
-                basePath = local;
-                return true;
-            }
+            AddUniquePath(roots, Path.Combine(Path.Combine(Application.persistentDataPath, "FF9DepthVR"), Path.Combine("fmv-depth", movieKey)));
+            AddUniquePath(roots, Path.Combine("C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth", movieKey));
+            return roots;
+        }
 
-            return false;
+        private static String TryGetGameRootPath()
+        {
+            try
+            {
+                DirectoryInfo dataDir = Directory.GetParent(Application.dataPath);
+                if (dataDir == null)
+                    return null;
+                DirectoryInfo gameDir = dataDir.Parent;
+                return gameDir != null ? gameDir.FullName : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void AddUniquePath(List<String> paths, String path)
+        {
+            if (String.IsNullOrEmpty(path))
+                return;
+            foreach (String existing in paths)
+            {
+                if (String.Equals(existing, path, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            paths.Add(path);
         }
 
         internal static Boolean HasUsableMovieDepthFrames(MovieMaterial movieMaterial, out String reason)
@@ -332,24 +469,46 @@ namespace Memoria.FF9DepthVR
                 return false;
             }
 
-            String basePath;
-            if (!TryResolveMovieFrameDirectory(movieKey, out basePath))
-            {
-                reason = "no fmv-depth directory";
+            MovieFrameSet frameSet;
+            if (!TryResolveMovieFrameSet(movieKey, out frameSet, out reason))
                 return false;
-            }
 
-            return HasUsableMovieDepthFrames(movieKey, basePath, out reason);
+            return HasUsableMovieDepthFrames(movieKey, frameSet, out reason);
         }
 
         internal static Boolean HasUsableMovieDepthFrames(String movieKey, String basePath, out String reason)
         {
+            MovieFrameSet frameSet = new MovieFrameSet
+            {
+                MovieKey = movieKey,
+                RootPath = basePath,
+                ColorFramesDirectory = Path.Combine(basePath, "color_frames"),
+                DepthFramesDirectory = Path.Combine(basePath, "depth_frames"),
+                DepthMoviePath = Path.Combine(basePath, movieKey + "_depth.bytes"),
+                ProgressPath = Path.Combine(basePath, "progress.json")
+            };
+            return HasUsableMovieDepthFrames(movieKey, frameSet, out reason);
+        }
+
+        internal static Boolean HasUsableMovieDepthFrames(String movieKey, MovieFrameSet frameSet, out String reason)
+        {
             reason = "missing movie depth directory";
-            if (String.IsNullOrEmpty(movieKey) || String.IsNullOrEmpty(basePath))
+            if (String.IsNullOrEmpty(movieKey) || frameSet == null)
                 return false;
 
-            String colorDir = Path.Combine(basePath, "color_frames");
-            String depthDir = Path.Combine(basePath, "depth_frames");
+            if (!String.IsNullOrEmpty(frameSet.DepthMoviePath) && File.Exists(frameSet.DepthMoviePath))
+            {
+                reason = "usable depth movie bytes for movie=" + movieKey + " path=" + frameSet.DepthMoviePath;
+                return true;
+            }
+
+            String colorDir = frameSet.ColorFramesDirectory;
+            String depthDir = frameSet.DepthFramesDirectory;
+            if (String.IsNullOrEmpty(colorDir) || String.IsNullOrEmpty(depthDir))
+            {
+                reason = "missing depth movie bytes or frame directories";
+                return false;
+            }
             if (!Directory.Exists(colorDir))
             {
                 reason = "missing color_frames directory";
@@ -373,11 +532,11 @@ namespace Memoria.FF9DepthVR
                 return false;
             }
 
-            String progressPath = Path.Combine(basePath, "progress.json");
+            String progressPath = frameSet.ProgressPath;
             if (File.Exists(progressPath))
                 return HasCompleteMovieDepthProgress(movieKey, colorDir, depthDir, progressPath, out reason);
 
-            reason = "usable frames without progress metadata at " + basePath;
+            reason = "usable frames without progress metadata color=" + colorDir + " depth=" + depthDir;
             return true;
         }
 
@@ -1478,10 +1637,11 @@ namespace Memoria.FF9DepthVR
             _depthTexture = depthTexture;
             if (_material != null)
             {
-                _material.mainTexture = colorTexture;
-                if (_material.HasProperty("_DepthTex"))
+                if (colorTexture != null)
+                    _material.mainTexture = colorTexture;
+                if (_material.HasProperty("_DepthTex") && depthTexture != null)
                     _material.SetTexture("_DepthTex", depthTexture);
-                if (_material.HasProperty("_ColorTexel"))
+                if (_material.HasProperty("_ColorTexel") && colorTexture != null)
                     _material.SetVector("_ColorTexel", new Vector4(1f / Mathf.Max(1, colorTexture.width), 1f / Mathf.Max(1, colorTexture.height), 0f, 0f));
             }
             _lastUpdatedFrame = -1;
@@ -3713,10 +3873,191 @@ namespace Memoria.FF9DepthVR
         }
     }
 
+    internal sealed class FF9DepthVRTheoraDepthStream : IDisposable
+    {
+        private const Int32 ReadbackWidth = FF9DepthVRMovieBgPlate.MovieColumns + 1;
+        private const Int32 ReadbackHeight = FF9DepthVRMovieBgPlate.MovieRows + 1;
+
+        private readonly String _path;
+        private IntPtr _context;
+        private IntPtr _nativeTextureContext;
+        private Texture2D _yTexture;
+        private Texture2D _readableDepth;
+        private RenderTexture _readbackTarget;
+        private Boolean _open;
+        private Boolean _disposed;
+        private Boolean _loggedFirstFrame;
+
+        [DllImport("theorawrapper")]
+        private static extern IntPtr CreateContext();
+
+        [DllImport("theorawrapper")]
+        private static extern void DestroyContext(IntPtr context);
+
+        [DllImport("theorawrapper")]
+        private static extern Boolean OpenStream(IntPtr context, String path, Int32 offset, Int32 size, Boolean pot, Boolean scanDuration, Int32 maxSkipFrames);
+
+        [DllImport("theorawrapper")]
+        private static extern void CloseStream(IntPtr context);
+
+        [DllImport("theorawrapper")]
+        private static extern Int32 GetYStride(IntPtr context);
+
+        [DllImport("theorawrapper")]
+        private static extern Int32 GetYHeight(IntPtr context);
+
+        [DllImport("theorawrapper")]
+        private static extern IntPtr GetNativeHandle(IntPtr context, Int32 planeIndex);
+
+        [DllImport("theorawrapper")]
+        private static extern IntPtr GetNativeTextureContext(IntPtr context);
+
+        [DllImport("theorawrapper")]
+        private static extern void SetTargetDisplayDecodeTime(IntPtr context, Double targetTime);
+
+        internal FF9DepthVRTheoraDepthStream(String path)
+        {
+            _path = path;
+            _context = CreateContext();
+            if (_context == IntPtr.Zero)
+                throw new InvalidOperationException("[FF9DepthVR] Failed to create Theora depth context.");
+
+            _open = OpenStream(_context, _path, 0, 0, false, false, 16);
+            if (!_open)
+                throw new FileLoadException("[FF9DepthVR] Failed to open depth movie stream.", _path);
+        }
+
+        internal Texture2D UpdateReadableDepth(Single seconds)
+        {
+            if (_disposed || !_open || _context == IntPtr.Zero)
+                return null;
+
+            SetTargetDisplayDecodeTime(_context, Math.Max(0.0, (Double)seconds));
+            GL.IssuePluginEvent(7);
+            EnsurePlaneTexture();
+            if (_yTexture == null)
+                return null;
+
+            EnsureReadbackBuffers();
+            Graphics.Blit(_yTexture, _readbackTarget);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = _readbackTarget;
+            _readableDepth.ReadPixels(new Rect(0f, 0f, ReadbackWidth, ReadbackHeight), 0, 0, false);
+            _readableDepth.Apply(false, false);
+            RenderTexture.active = previous;
+            NormalizeAlphaDepthIfNeeded(_readableDepth);
+
+            if (!_loggedFirstFrame)
+            {
+                _loggedFirstFrame = true;
+                Log.Message("[FF9DepthVR] Depth movie stream first readback path=" + _path + " source=" + _yTexture.width + "x" + _yTexture.height + " readback=" + _readableDepth.width + "x" + _readableDepth.height);
+            }
+            return _readableDepth;
+        }
+
+        private void EnsurePlaneTexture()
+        {
+            IntPtr nativeTextureContext = GetNativeTextureContext(_context);
+            if (nativeTextureContext == _nativeTextureContext && _yTexture != null)
+                return;
+
+            if (_yTexture != null)
+                UnityEngine.Object.Destroy(_yTexture);
+
+            Int32 width = Mathf.Max(1, GetYStride(_context));
+            Int32 height = Mathf.Max(1, GetYHeight(_context));
+            _yTexture = Texture2D.CreateExternalTexture(width, height, TextureFormat.Alpha8, false, true, GetNativeHandle(_context, 0));
+            _yTexture.wrapMode = TextureWrapMode.Clamp;
+            _yTexture.filterMode = FilterMode.Bilinear;
+            _nativeTextureContext = nativeTextureContext;
+        }
+
+        private void EnsureReadbackBuffers()
+        {
+            if (_readableDepth == null)
+            {
+                _readableDepth = new Texture2D(ReadbackWidth, ReadbackHeight, TextureFormat.ARGB32, false, true);
+                _readableDepth.wrapMode = TextureWrapMode.Clamp;
+                _readableDepth.filterMode = FilterMode.Bilinear;
+            }
+
+            if (_readbackTarget == null)
+            {
+                _readbackTarget = new RenderTexture(ReadbackWidth, ReadbackHeight, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                _readbackTarget.wrapMode = TextureWrapMode.Clamp;
+                _readbackTarget.filterMode = FilterMode.Bilinear;
+                _readbackTarget.Create();
+            }
+        }
+
+        private static void NormalizeAlphaDepthIfNeeded(Texture2D texture)
+        {
+            Color32[] pixels = texture.GetPixels32();
+            Int32 rgbMin = 255;
+            Int32 rgbMax = 0;
+            Int32 alphaMin = 255;
+            Int32 alphaMax = 0;
+            for (Int32 i = 0; i < pixels.Length; i++)
+            {
+                Color32 pixel = pixels[i];
+                Int32 rgb = Math.Max(pixel.r, Math.Max(pixel.g, pixel.b));
+                rgbMin = Math.Min(rgbMin, rgb);
+                rgbMax = Math.Max(rgbMax, rgb);
+                alphaMin = Math.Min(alphaMin, pixel.a);
+                alphaMax = Math.Max(alphaMax, pixel.a);
+            }
+
+            if (rgbMax > 2 || alphaMax - alphaMin <= 2)
+                return;
+
+            for (Int32 i = 0; i < pixels.Length; i++)
+            {
+                Byte depth = pixels[i].a;
+                pixels[i] = new Color32(depth, depth, depth, 255);
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            if (_open && _context != IntPtr.Zero)
+            {
+                CloseStream(_context);
+                _open = false;
+            }
+            if (_context != IntPtr.Zero)
+            {
+                DestroyContext(_context);
+                _context = IntPtr.Zero;
+            }
+            if (_yTexture != null)
+            {
+                UnityEngine.Object.Destroy(_yTexture);
+                _yTexture = null;
+            }
+            if (_readableDepth != null)
+            {
+                UnityEngine.Object.Destroy(_readableDepth);
+                _readableDepth = null;
+            }
+            if (_readbackTarget != null)
+            {
+                _readbackTarget.Release();
+                UnityEngine.Object.Destroy(_readbackTarget);
+                _readbackTarget = null;
+            }
+        }
+    }
+
     public sealed class FF9DepthVRMovieBgPlate : MonoBehaviour
     {
-        private const Int32 MovieColumns = 96;
-        private const Int32 MovieRows = 54;
+        internal const Int32 MovieColumns = 96;
+        internal const Int32 MovieRows = 54;
 
         private global::FieldMap _fieldMap;
         private Camera _movieCamera;
@@ -3733,6 +4074,9 @@ namespace Memoria.FF9DepthVR
         private FF9DepthVRParallax _parallax;
         private Texture2D _colorTexture;
         private Texture2D _depthTexture;
+        private FF9DepthVRTheoraDepthStream _depthMovieStream;
+        private String _depthMoviePath;
+        private Boolean _depthTextureFromMovieStream;
         private String _movieKey;
         private Int32 _lastFrame = -1;
         private Boolean _loggedFirstFrame;
@@ -3766,6 +4110,8 @@ namespace Memoria.FF9DepthVR
             }
             _movieKey = null;
             _lastFrame = -1;
+            _depthMoviePath = null;
+            _depthTextureFromMovieStream = false;
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
             _hidNativeMoviePlane = false;
@@ -3797,6 +4143,8 @@ namespace Memoria.FF9DepthVR
             }
             _movieKey = null;
             _lastFrame = -1;
+            _depthMoviePath = null;
+            _depthTextureFromMovieStream = false;
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
             _hidNativeMoviePlane = false;
@@ -3921,6 +4269,7 @@ namespace Memoria.FF9DepthVR
                 Destroy(_colorTexture);
                 _colorTexture = null;
             }
+            DisposeDepthMovieStream();
             if (_depthTexture != null)
             {
                 Destroy(_depthTexture);
@@ -3934,6 +4283,7 @@ namespace Memoria.FF9DepthVR
             _movieCamera = null;
             _movieCameraOriginalCullingMask = 0;
             _movieMaterial = null;
+            _depthMoviePath = null;
             _standaloneMode = false;
             _hidFieldDepthReplacement = false;
             _isActive = false;
@@ -3942,17 +4292,124 @@ namespace Memoria.FF9DepthVR
 
         private Boolean TryLoadFrame(String movieKey, Int32 frame)
         {
-            String basePath = ResolveMovieFrameDirectory(movieKey);
-            if (String.IsNullOrEmpty(basePath))
+            FF9DepthVRFieldRenderer.MovieFrameSet frameSet;
+            String reason;
+            if (!FF9DepthVRFieldRenderer.TryResolveMovieFrameSet(movieKey, out frameSet, out reason))
             {
-                LogMissingFramePath("no frame directory for movie=" + movieKey);
+                LogMissingFramePath("no depth assets for movie=" + movieKey + " reason=" + reason);
+                FallbackToNativeMovie();
+                return false;
+            }
+
+            Boolean depthMovieUnavailable;
+            if (TryLoadDepthMovieFrame(movieKey, frameSet, frame, out depthMovieUnavailable))
+                return true;
+            if (!depthMovieUnavailable && !String.IsNullOrEmpty(frameSet.DepthMoviePath) && File.Exists(frameSet.DepthMoviePath))
+                return false;
+
+            return TryLoadPngFrame(movieKey, frameSet, frame);
+        }
+
+        private Boolean TryLoadDepthMovieFrame(String movieKey, FF9DepthVRFieldRenderer.MovieFrameSet frameSet, Int32 frame, out Boolean streamUnavailable)
+        {
+            streamUnavailable = false;
+            if (frameSet == null || String.IsNullOrEmpty(frameSet.DepthMoviePath) || !File.Exists(frameSet.DepthMoviePath))
+            {
+                streamUnavailable = true;
+                return false;
+            }
+
+            try
+            {
+                if (_depthMovieStream == null || !String.Equals(_depthMoviePath, frameSet.DepthMoviePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    DisposeDepthMovieStream();
+                    ReleaseOwnedFrameTextures();
+                    _depthMovieStream = new FF9DepthVRTheoraDepthStream(frameSet.DepthMoviePath);
+                    _depthMoviePath = frameSet.DepthMoviePath;
+                    Log.Message("[FF9DepthVR] Movie BGPlate using depth movie bytes movie=" + movieKey + " path=" + frameSet.DepthMoviePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Message("[FF9DepthVR] Movie BGPlate depth movie open failed movie=" + movieKey + " path=" + frameSet.DepthMoviePath + " error=" + ex.Message);
+                DisposeDepthMovieStream();
+                streamUnavailable = true;
+                return false;
+            }
+
+            Texture2D depth = _depthMovieStream.UpdateReadableDepth(_movieMaterial.PlayPosition);
+            if (depth == null)
+                return false;
+
+            if (!_loggedFirstFrame)
+            {
+                _loggedFirstFrame = true;
+                Log.Message("[FF9DepthVR] Movie BGPlate first depth movie frame movie=" + movieKey + " frame=" + frame + " colorMovie=" + _movieMaterial.Width + "x" + _movieMaterial.Height + " depthReadback=" + depth.width + "x" + depth.height + " source=bytes");
+            }
+
+            Single width;
+            Single height;
+            Single depthScale;
+            if (_standaloneMode)
+            {
+                CalculateStandalonePlateSize(_movieMaterial.Width, _movieMaterial.Height, out width, out height);
+                depthScale = FF9DepthVRFieldRenderer.MovieStandaloneDepthScale;
+            }
+            else
+            {
+                width = Mathf.Max(1, _movieMaterial.Width) * FF9DepthVRFieldRenderer.DefaultSourceScale;
+                height = Mathf.Max(1, _movieMaterial.Height) * FF9DepthVRFieldRenderer.DefaultSourceScale;
+                depthScale = FF9DepthVRFieldRenderer.DefaultGeometryDepthScale;
+            }
+
+            EnsureRoot(null, depth, width, height, _movieMaterial.Material);
+            if (_meshRenderer != null)
+                _meshRenderer.enabled = !_standaloneMode;
+            Vector3[] vertices;
+            Vector2[] uvs;
+            Color[] colors;
+            Int32[] triangles;
+            BuildMovieMesh(depth, width, height, depthScale, _standaloneMode, out vertices, out uvs, out colors, out triangles);
+            _mesh.Clear();
+            _mesh.vertices = vertices;
+            _mesh.uv = uvs;
+            _mesh.colors = colors;
+            _mesh.triangles = triangles;
+            _mesh.RecalculateNormals();
+            _mesh.RecalculateBounds();
+            if (_parallax != null)
+                _parallax.ReplaceSource(_mesh, vertices, colors, width, height, null, depth);
+            if (!_standaloneMode)
+            {
+                HideFieldDepthReplacement();
+                HideNativeMoviePlane();
+            }
+
+            if (_colorTexture != null)
+            {
+                Destroy(_colorTexture);
+                _colorTexture = null;
+            }
+            if (_depthTexture != depth && _depthTexture != null && !_depthTextureFromMovieStream)
+                Destroy(_depthTexture);
+            _depthTexture = depth;
+            _depthTextureFromMovieStream = true;
+            return true;
+        }
+
+        private Boolean TryLoadPngFrame(String movieKey, FF9DepthVRFieldRenderer.MovieFrameSet frameSet, Int32 frame)
+        {
+            if (frameSet == null || String.IsNullOrEmpty(frameSet.ColorFramesDirectory) || String.IsNullOrEmpty(frameSet.DepthFramesDirectory))
+            {
+                LogMissingFramePath("missing frame directories for movie=" + movieKey);
                 FallbackToNativeMovie();
                 return false;
             }
 
             String frameName = "frame_" + frame.ToString("D6") + ".png";
-            String colorPath = Path.Combine(Path.Combine(basePath, "color_frames"), frameName);
-            String depthPath = Path.Combine(Path.Combine(basePath, "depth_frames"), frameName);
+            String colorPath = Path.Combine(frameSet.ColorFramesDirectory, frameName);
+            String depthPath = Path.Combine(frameSet.DepthFramesDirectory, frameName);
             if (!File.Exists(colorPath) || !File.Exists(depthPath))
             {
                 LogMissingFramePath("missing color/depth frame color=" + colorPath + " depth=" + depthPath);
@@ -3960,6 +4417,7 @@ namespace Memoria.FF9DepthVR
                 return false;
             }
 
+            DisposeDepthMovieStream();
             Texture2D color = LoadPng(colorPath, false);
             Texture2D depth = LoadPng(depthPath, true);
             if (color == null || depth == null)
@@ -4029,7 +4487,37 @@ namespace Memoria.FF9DepthVR
                 Destroy(_depthTexture);
             _colorTexture = color;
             _depthTexture = depth;
+            _depthTextureFromMovieStream = false;
             return true;
+        }
+
+        private void ReleaseOwnedFrameTextures()
+        {
+            if (_colorTexture != null)
+            {
+                Destroy(_colorTexture);
+                _colorTexture = null;
+            }
+            if (_depthTexture != null && !_depthTextureFromMovieStream)
+            {
+                Destroy(_depthTexture);
+                _depthTexture = null;
+            }
+            if (!_depthTextureFromMovieStream)
+                _depthTexture = null;
+        }
+
+        private void DisposeDepthMovieStream()
+        {
+            if (_depthMovieStream != null)
+            {
+                _depthMovieStream.Dispose();
+                _depthMovieStream = null;
+            }
+            if (_depthTextureFromMovieStream)
+                _depthTexture = null;
+            _depthTextureFromMovieStream = false;
+            _depthMoviePath = null;
         }
 
         private void LogMissingFramePath(String message)
@@ -4043,12 +4531,19 @@ namespace Memoria.FF9DepthVR
 
         private void CalculateStandalonePlateSize(Texture2D color, out Single width, out Single height)
         {
+            Int32 colorWidth = color != null ? color.width : 0;
+            Int32 colorHeight = color != null ? color.height : 0;
+            CalculateStandalonePlateSize(colorWidth, colorHeight, out width, out height);
+        }
+
+        private void CalculateStandalonePlateSize(Int32 colorWidth, Int32 colorHeight, out Single width, out Single height)
+        {
             Single distance = FF9DepthVRFieldRenderer.MoviePlateDistance;
             Single fov = _movieCamera != null ? Mathf.Max(1f, _movieCamera.fieldOfView) : 60f;
             Single viewHeight = 2f * distance * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
             Single viewAspect = FF9DepthVRMovieSbsStereo.GetRenderAspect(_movieCamera);
             Single viewWidth = viewHeight * Mathf.Max(0.01f, viewAspect);
-            Single videoAspect = color != null && color.height > 0 ? (Single)color.width / color.height : 4f / 3f;
+            Single videoAspect = colorHeight > 0 ? (Single)Mathf.Max(1, colorWidth) / colorHeight : 4f / 3f;
 
             if (FF9DepthVRFieldRenderer.SbsActive)
             {
@@ -4068,8 +4563,26 @@ namespace Memoria.FF9DepthVR
 
         private void EnsureRoot(Texture2D color, Texture2D depth, Single width, Single height)
         {
+            EnsureRoot(color, depth, width, height, null);
+        }
+
+        private void EnsureRoot(Texture2D color, Texture2D depth, Single width, Single height, Material overrideMaterial)
+        {
             if (_root != null)
+            {
+                if (overrideMaterial != null && _meshRenderer != null && _meshRenderer.sharedMaterial != overrideMaterial)
+                {
+                    _material = overrideMaterial;
+                    _material.renderQueue = FF9DepthVRFieldRenderer.ReplacementPlateRenderQueue;
+                    _meshRenderer.sharedMaterial = _material;
+                }
+                else if (overrideMaterial == null && color != null && _meshRenderer != null && _movieMaterial != null && _material == _movieMaterial.Material)
+                {
+                    _material = FF9DepthVRFieldRenderer.CreateMoviePlateMaterial(color, depth);
+                    _meshRenderer.sharedMaterial = _material;
+                }
                 return;
+            }
 
             _root = new GameObject("FF9DepthVR_MovieBGPlate");
             SyncRootParent();
@@ -4079,7 +4592,9 @@ namespace Memoria.FF9DepthVR
             MeshRenderer meshRenderer = _root.AddComponent<MeshRenderer>();
             _meshRenderer = meshRenderer;
             meshFilter.sharedMesh = _mesh;
-            _material = FF9DepthVRFieldRenderer.CreateMoviePlateMaterial(color, depth);
+            _material = overrideMaterial != null ? overrideMaterial : FF9DepthVRFieldRenderer.CreateMoviePlateMaterial(color, depth);
+            if (_material != null)
+                _material.renderQueue = FF9DepthVRFieldRenderer.ReplacementPlateRenderQueue;
             meshRenderer.sharedMaterial = _material;
             if (_standaloneMode)
                 meshRenderer.enabled = false;

@@ -4,13 +4,13 @@ https://youtu.be/EIp4YJxWL2s
 
 FFIX3DVR is a work-in-progress Memoria mod and tooling project for playing Final Fantasy IX with depth-reconstructed field backgrounds, side-by-side 3D output, and WebXR/VR-oriented preview tools.
 
-The current public package is an alpha test. Field scenes, actors, shadows, dialogue UI, battles, and SBS/compare preview modes are the focus right now. Full 3D FMVs are not included yet.
+The current public package is an alpha test. Field scenes, actors, shadows, dialogue UI, battles, SBS/compare preview modes, and experimental FMV depth playback are the focus right now.
 
 ## Current Alpha
 
 Download the latest sanitized alpha from the GitHub releases page:
 
-- [FF9DepthVR 0.2.0 Open Beta 3 (sanitized)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.3)
+- [FF9DepthVR 0.2.0 Open Beta 4 (FMV depth bytes alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.4)
 
 The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
 
@@ -28,18 +28,14 @@ The release is intended for testing and feedback. Expect rough edges, scene-spec
 
 ## FMV Status
 
-3D FMVs are still being generated and integrated.
-
-The FMV Depth-Anything batch is still rendering frame-by-frame depth data locally. As of the May 31 alpha work session, the batch had completed roughly 20k frames and was still progressing through later FMVs. The full target is expected to be around 72k FMV frames, so completion depends on uninterrupted GPU runtime, failed-frame reruns, and final packaging.
-
-Current estimate: a few days of continued local batch processing for the full FMV depth set, followed by an implementation/testing pass before 3D FMVs can be included in a release.
+The first generated FMV depth set is included as depth-only Theora `.bytes` streams. The package does not include original FMV color frames or movie files; color playback comes from the user's legally owned game install.
 
 Important FMV limitations in this alpha:
 
-- 3D FMV depth playback is not shipped in the public package yet.
-- FMVs currently use the safer native playback path instead of full depth-displaced 3D movie surfaces.
-- Field backgrounds that transition into FMV playback still need a consistently working implementation for animated FMV background plates.
-- FMVs with actors or walkmesh interaction will need per-frame depth projection once the depth sequences are complete.
+- 3D FMV depth playback is experimental and may fall back to native 2D playback if a depth stream is missing or fails to open.
+- FMV field background plates are still being stabilized across every transition.
+- FMVs with actors or walkmesh interaction still need per-frame walkmesh projection against the generated depth.
+- Future FMV depth passes may be regenerated as the projection and stereo tuning improves.
 
 ## Sanitized Repository
 
@@ -57,7 +53,7 @@ You need a legally owned Steam copy of Final Fantasy IX. Local tools can generat
 ## Not Included
 
 - Original FFIX `source_plate*.png` background plates.
-- Original FMV color frames or movies.
+- Original FMV color frames or movies. Only generated FMV depth `.bytes` streams are packaged.
 - Outpainted/color ERP panoramas.
 - Gaussian splat/PLY/KSPLAT color assets.
 - Steam game files, local virtual environments, `node_modules`, and generated build folders.
