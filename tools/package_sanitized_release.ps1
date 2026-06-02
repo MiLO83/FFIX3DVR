@@ -29,6 +29,31 @@ function Copy-Directory([string]$from, [string]$to, [string[]]$excludeDirs = @()
     }
 }
 
+function Convert-ToMemoriaFileListEntry([string]$relativePath) {
+    $entry = $relativePath.Replace("\", "/").Trim()
+    if ($entry.StartsWith("StreamingAssets/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $entry.Substring("StreamingAssets/".Length)
+    }
+    if ($entry.StartsWith("FF9_Data/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $entry.Substring("FF9_Data/".Length)
+    }
+    return $entry
+}
+
+function Write-MemoriaFileList([string]$modPath) {
+    $modFull = [System.IO.Path]::GetFullPath($modPath).TrimEnd('\') + '\'
+    $escaped = [Regex]::Escape($modFull)
+    $entries = Get-ChildItem -Path $modPath -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne "ModFileList.txt" } |
+        ForEach-Object {
+            $relative = [System.IO.Path]::GetFullPath($_.FullName) -replace "^$escaped", ""
+            Convert-ToMemoriaFileListEntry $relative
+        } |
+        Where-Object { $_ -and ($_ -notmatch "source_plate|field_erp|\.ply|\.ksplat|\.splat") } |
+        Sort-Object -Unique
+    Set-Content -Path (Join-Path $modPath "ModFileList.txt") -Value $entries -Encoding UTF8
+}
+
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 Assert-UnderRoot $stage
 Assert-UnderRoot $zip
@@ -74,15 +99,11 @@ Copy-Directory (Join-Path $root "artifacts\all-fields\logs") (Join-Path $allFiel
 $modSrc = Join-Path $root "artifacts\memoria-mod\FF9DepthVR"
 $modDst = Join-Path $stage "artifacts\memoria-mod\FF9DepthVR"
 Copy-Directory $modSrc $modDst @() @("source_plate*.png", "field_erp*.png", "*.ply", "*.ksplat", "*.splat")
-$modFileList = Join-Path $modDst "ModFileList.txt"
-if (Test-Path $modFileList) {
-    (Get-Content $modFileList | Where-Object { $_ -notmatch "source_plate|field_erp|\.ply|\.ksplat|\.splat" }) |
-        Set-Content -Path $modFileList -Encoding UTF8
-}
 
 $fmvDepthSrc = Join-Path $root "artifacts\fmv-depth"
 $fmvDepthDst = Join-Path $modDst "StreamingAssets\Data\FF9DepthVR\fmv-depth"
 Copy-Directory $fmvDepthSrc $fmvDepthDst @("color_frames", "depth_frames") @("frame_*.png", "*.tmp")
+Write-MemoriaFileList $modDst
 
 $patchDst = Join-Path $stage "memoria-patch-source"
 New-Item -ItemType Directory -Force -Path $patchDst | Out-Null
