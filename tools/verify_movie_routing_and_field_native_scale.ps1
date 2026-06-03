@@ -32,8 +32,8 @@ Assert-SourceContains `
     "Standalone FMV keys must bypass the field movie branch even when a FieldMap exists."
 
 Assert-SourceContains `
-    'Field movie BGPlate disabled; native movie remains active[\s\S]*BeginNativeMoviePlaneSbs\(nativeMoviePlane,\s*false\)' `
-    "Native field MBG playback should not half-scale the movie plane; field/SBS cameras own the viewport."
+    'Field movie BGPlate disabled; native movie remains active[\s\S]*BeginNativeMoviePlaneSbs\(nativeMoviePlane,\s*false,\s*true,\s*fieldMap\)' `
+    "Native field MBG playback should preserve native scale but suppress the one-eye native plane during SBS handoff."
 
 Assert-SourceContains `
     'BeginNativeMovieFallback\(movieMaterial,\s*nativeMoviePlane,\s*"Standalone movie BGPlate fallback",\s*movieDepthReason,\s*true\)' `
@@ -50,5 +50,9 @@ Assert-SourceContains `
 Assert-SourceContains `
     'FF9DepthVRFieldRenderer\.SbsActive\s*&&\s*_scaleForSbs' `
     "Native movie scaler should only change localScale when explicitly requested."
+
+Assert-SourceContains `
+    'FF9DepthVRFieldRenderer\.SbsActive\s*&&\s*_suppressInSbs' `
+    "Native movie scaler should suppress renderer visibility only while SBS is active."
 
 Write-Host "Movie routing and native field scale verifier passed."

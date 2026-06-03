@@ -200,8 +200,8 @@ namespace Memoria.FF9DepthVR
                     EndFieldMoviePlate(_activeMovieFieldMap);
                 _activeMovieFieldMap = fieldMap;
                 _activeMoviePlate = null;
-                SetDepthReplacementVisible(fieldMap, false);
-                BeginNativeMoviePlaneSbs(nativeMoviePlane, false);
+                SetDepthReplacementVisible(fieldMap, SbsActive);
+                BeginNativeMoviePlaneSbs(nativeMoviePlane, false, true, fieldMap);
                 return;
             }
             String movieDepthReason;
@@ -295,6 +295,11 @@ namespace Memoria.FF9DepthVR
 
         private static void BeginNativeMoviePlaneSbs(GameObject nativeMoviePlane, Boolean scaleForSbs)
         {
+            BeginNativeMoviePlaneSbs(nativeMoviePlane, scaleForSbs, false, null);
+        }
+
+        private static void BeginNativeMoviePlaneSbs(GameObject nativeMoviePlane, Boolean scaleForSbs, Boolean suppressInSbs, global::FieldMap suppressionFieldMap)
+        {
             if (nativeMoviePlane == null)
             {
                 Log.Message("[FF9DepthVR] Native field movie SBS scaler skipped: no native movie plane.");
@@ -309,7 +314,7 @@ namespace Memoria.FF9DepthVR
                 scaler = nativeMoviePlane.AddComponent<FF9DepthVRNativeMoviePlaneSbsScaler>();
 
             _activeNativeMoviePlaneScaler = scaler;
-            scaler.Initialize(nativeMoviePlane, scaleForSbs);
+            scaler.Initialize(nativeMoviePlane, scaleForSbs, suppressInSbs, suppressionFieldMap);
         }
 
         private static void BeginNativeMovieFallback(MovieMaterial movieMaterial, GameObject nativeMoviePlane, String context, String reason, Boolean scaleForSbs)
@@ -3989,47 +3994,77 @@ namespace Memoria.FF9DepthVR
     {
         private Transform _target;
         private Vector3 _baseScale = Vector3.one;
+        private Renderer[] _renderers = new Renderer[0];
+        private Boolean[] _baseRendererEnabled = new Boolean[0];
+        private global::FieldMap _suppressionFieldMap;
         private Boolean _hasBaseScale;
         private Boolean _scaleForSbs;
+        private Boolean _suppressInSbs;
         private Boolean _scaled;
+        private Boolean _renderersSuppressed;
+        private Boolean _hasSuppressionPlateVisible;
+        private Boolean _suppressionPlateVisible;
 
         public void Initialize(GameObject nativeMoviePlane, Boolean scaleForSbs)
+        {
+            Initialize(nativeMoviePlane, scaleForSbs, false, null);
+        }
+
+        public void Initialize(GameObject nativeMoviePlane, Boolean scaleForSbs, Boolean suppressInSbs, global::FieldMap suppressionFieldMap)
         {
             if (nativeMoviePlane == null)
                 return;
 
             if (_scaled)
                 RestoreBaseScale();
+            RestoreRendererStates();
 
             _target = nativeMoviePlane.transform;
             _baseScale = _target.localScale;
+            _renderers = nativeMoviePlane.GetComponentsInChildren<Renderer>(true);
+            _baseRendererEnabled = new Boolean[_renderers.Length];
+            for (Int32 i = 0; i < _renderers.Length; i++)
+                _baseRendererEnabled[i] = _renderers[i] != null && _renderers[i].enabled;
             _hasBaseScale = true;
             _scaleForSbs = scaleForSbs;
+            _suppressInSbs = suppressInSbs;
+            _suppressionFieldMap = suppressionFieldMap;
             _scaled = false;
+            _renderersSuppressed = false;
+            _hasSuppressionPlateVisible = false;
             enabled = true;
-            ApplyScale();
+            ApplyState();
         }
 
         private void LateUpdate()
         {
-            ApplyScale();
+            ApplyState();
         }
 
         private void OnDisable()
         {
             RestoreBaseScale();
+            RestoreRendererStates();
         }
 
         private void OnDestroy()
         {
             RestoreBaseScale();
+            RestoreRendererStates();
         }
 
         public void Shutdown()
         {
             RestoreBaseScale();
+            RestoreRendererStates();
             enabled = false;
             Destroy(this);
+        }
+
+        private void ApplyState()
+        {
+            ApplyScale();
+            ApplyRendererSuppression();
         }
 
         private void ApplyScale()
@@ -4055,6 +4090,54 @@ namespace Memoria.FF9DepthVR
 
             _target.localScale = _baseScale;
             _scaled = false;
+        }
+
+        private void ApplyRendererSuppression()
+        {
+            Boolean suppress = FF9DepthVRFieldRenderer.SbsActive && _suppressInSbs;
+            ApplySuppressionPlateVisibility(suppress);
+
+            if (suppress)
+            {
+                for (Int32 i = 0; i < _renderers.Length; i++)
+                {
+                    Renderer renderer = _renderers[i];
+                    if (renderer != null)
+                        renderer.enabled = false;
+                }
+                _renderersSuppressed = true;
+            }
+            else
+            {
+                RestoreRendererStates();
+            }
+        }
+
+        private void ApplySuppressionPlateVisibility(Boolean visible)
+        {
+            if (_suppressionFieldMap == null)
+                return;
+            if (_hasSuppressionPlateVisible && _suppressionPlateVisible == visible)
+                return;
+
+            FF9DepthVRFieldRenderer.SetDepthReplacementVisible(_suppressionFieldMap, visible);
+            _suppressionPlateVisible = visible;
+            _hasSuppressionPlateVisible = true;
+        }
+
+        private void RestoreRendererStates()
+        {
+            if (_renderers == null || _baseRendererEnabled == null || !_renderersSuppressed)
+                return;
+
+            Int32 count = Mathf.Min(_renderers.Length, _baseRendererEnabled.Length);
+            for (Int32 i = 0; i < count; i++)
+            {
+                Renderer renderer = _renderers[i];
+                if (renderer != null)
+                    renderer.enabled = _baseRendererEnabled[i];
+            }
+            _renderersSuppressed = false;
         }
     }
 
