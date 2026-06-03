@@ -27,7 +27,7 @@ namespace Memoria.FF9DepthVR
         private const String ManifestPath = "Data/FF9DepthVR/manifest.json";
         internal const String RootName = "FF9DepthVR_Background";
         private const Single DepthUnitScale = 32f;
-        internal const Int32 ReplacementPlateRenderQueue = 2998;
+        internal const Int32 ReplacementPlateRenderQueue = 1500;
         internal const Single ViewAngleMultiplier = 3f;
         internal const Single ViewAngleXMultiplier = 2f;
 
@@ -41,6 +41,7 @@ namespace Memoria.FF9DepthVR
         private static Int32 _lastSbsToggleFrame = -1;
         private static Int32 _lastActorLookToggleFrame = -1;
         private static Int32 _lastVrCaptureToggleFrame = -1;
+        private static Int32 _lastForegroundMaskWarpToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
         private static Boolean _movieDebugOverlayEnabled;
         private static FF9DepthVRMovieBgPlate _activeMoviePlate;
@@ -51,11 +52,22 @@ namespace Memoria.FF9DepthVR
         public static Boolean SbsEnabled = false;
         public static Boolean VrCaptureEnabled = false;
         public static Boolean ActorLookEnabled = false;
+        internal static Boolean ForegroundMaskDepthWarpEnabled = true;
         public static Boolean WasSbsToggleInputHandledThisFrame => _lastSbsToggleFrame == Time.frameCount;
         internal static Boolean SbsActive => VrCaptureEnabled || ViewMode != DepthViewMode.Depth;
         internal static Boolean CompareEnabled => !VrCaptureEnabled && ViewMode == DepthViewMode.Compare;
         internal static Boolean MovieDebugOverlayEnabled => _movieDebugOverlayEnabled;
         internal static Boolean MoviePlateActive => _activeMoviePlate != null && _activeMoviePlate.IsActive;
+        internal static String ModeStatusText
+        {
+            get
+            {
+                String view = VrCaptureEnabled ? "VR" : ViewMode.ToString();
+                String mask = ForegroundMaskDepthWarpEnabled ? "Depth masks" : "Flat masks";
+                String look = ActorLookEnabled ? "Actor+input look" : "Input look";
+                return "FF9DepthVR | View: " + view + " | " + mask + " (F6) | " + look + " (F8)" + (IsMbgPlaybackActive() ? " | MBG" : String.Empty);
+            }
+        }
         internal static Boolean IsMbgPlaybackActive()
         {
             try
@@ -72,25 +84,42 @@ namespace Memoria.FF9DepthVR
             }
         }
 
+        private static Boolean IsFieldMovieKey(String movieKey)
+        {
+            return !String.IsNullOrEmpty(movieKey) && movieKey.StartsWith("mbg", StringComparison.OrdinalIgnoreCase);
+        }
+
         internal static Single DefaultSourceScale => _defaults.SourceScale;
         internal static Single DefaultGeometryDepthScale => _defaults.GeometryDepthScale > 0f ? _defaults.GeometryDepthScale : Mathf.Max(1f, _defaults.DepthStrength * DepthUnitScale);
         internal static Single DefaultParallaxStrength => _defaults.ParallaxStrength;
         internal static Single DefaultIdleParallaxStrength => _defaults.IdleParallaxStrength;
         internal static Single MoviePlateDistance => 2f;
-        internal static Single MovieStandaloneDepthScale => 0.35f;
-        private static readonly Boolean EnableFieldMovieDepthPlate = true;
+        internal static Single MovieStandaloneDepthScale => 0.12f;
+        private static readonly Boolean EnableFieldMovieDepthPlate = false;
 
         public static Boolean TryHandleSbsToggleInput()
         {
             Boolean actorLookHandled = TryHandleActorLookToggleInput();
             Boolean vrCaptureHandled = TryHandleVrCaptureToggleInput();
+            Boolean maskWarpHandled = TryHandleForegroundMaskWarpToggleInput();
             if (!Input.GetKeyDown(KeyCode.F9) || _lastSbsToggleFrame == Time.frameCount)
-                return actorLookHandled || vrCaptureHandled;
+                return actorLookHandled || vrCaptureHandled || maskWarpHandled;
 
             _lastSbsToggleFrame = Time.frameCount;
             ViewMode = ViewMode == DepthViewMode.Depth ? DepthViewMode.Stereo3D : ViewMode == DepthViewMode.Stereo3D ? DepthViewMode.Compare : DepthViewMode.Depth;
             ApplySbsState();
             Log.Message("[FF9DepthVR] View mode = " + ViewMode + " (F9)");
+            return true;
+        }
+
+        public static Boolean TryHandleForegroundMaskWarpToggleInput()
+        {
+            if (!Input.GetKeyDown(KeyCode.F6) || _lastForegroundMaskWarpToggleFrame == Time.frameCount)
+                return false;
+
+            _lastForegroundMaskWarpToggleFrame = Time.frameCount;
+            ForegroundMaskDepthWarpEnabled = !ForegroundMaskDepthWarpEnabled;
+            Log.Message("[FF9DepthVR] Foreground mask depth warp enabled = " + ForegroundMaskDepthWarpEnabled + " (F6)");
             return true;
         }
 
@@ -167,19 +196,24 @@ namespace Memoria.FF9DepthVR
             if (!EnableFieldMovieDepthPlate)
             {
                 Log.Message("[FF9DepthVR] Field movie BGPlate disabled; native movie remains active for movie=" + movieMaterial.movieKey + ".");
-                BeginNativeMoviePlaneSbs(nativeMoviePlane);
+                if (_activeMoviePlate != null && _activeMovieFieldMap != fieldMap)
+                    EndFieldMoviePlate(_activeMovieFieldMap);
+                _activeMovieFieldMap = fieldMap;
+                _activeMoviePlate = null;
+                SetDepthReplacementVisible(fieldMap, false);
+                BeginNativeMoviePlaneSbs(nativeMoviePlane, false);
                 return;
             }
             String movieDepthReason;
             if (!HasUsableMovieDepthFrames(movieMaterial, out movieDepthReason))
             {
-                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Field movie BGPlate fallback", movieDepthReason);
+                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Field movie BGPlate fallback", movieDepthReason, false);
                 return;
             }
             if (!HasDepthReplacement(fieldMap))
             {
                 Log.Message("[FF9DepthVR] Field movie BGPlate skipped: no active field depth BGPlate for movie=" + movieMaterial.movieKey + ".");
-                BeginNativeMoviePlaneSbs(nativeMoviePlane);
+                BeginNativeMoviePlaneSbs(nativeMoviePlane, false);
                 return;
             }
 
@@ -197,17 +231,18 @@ namespace Memoria.FF9DepthVR
 
         internal static void BeginMoviePlate(global::FieldMap fieldMap, MovieMaterial movieMaterial, GameObject nativeMoviePlane, Camera movieCamera)
         {
-            if (fieldMap != null && HasDepthReplacement(fieldMap))
-            {
-                BeginFieldMoviePlate(fieldMap, movieMaterial, nativeMoviePlane);
-                return;
-            }
-
             if (movieMaterial == null)
             {
                 Log.Message("[FF9DepthVR] Movie BGPlate skipped: no MovieMaterial.");
                 return;
             }
+
+            if (fieldMap != null && HasDepthReplacement(fieldMap) && IsFieldMovieKey(movieMaterial.movieKey))
+            {
+                BeginFieldMoviePlate(fieldMap, movieMaterial, nativeMoviePlane);
+                return;
+            }
+
             if (movieCamera == null)
             {
                 Log.Message("[FF9DepthVR] Movie BGPlate skipped: no movie camera for movie=" + movieMaterial.movieKey + ".");
@@ -217,7 +252,7 @@ namespace Memoria.FF9DepthVR
             String movieDepthReason;
             if (!HasUsableMovieDepthFrames(movieMaterial, out movieDepthReason))
             {
-                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Standalone movie BGPlate fallback", movieDepthReason);
+                BeginNativeMovieFallback(movieMaterial, nativeMoviePlane, "Standalone movie BGPlate fallback", movieDepthReason, true);
                 return;
             }
 
@@ -258,7 +293,7 @@ namespace Memoria.FF9DepthVR
             return MoviePlateActive && (_activeMovieFieldMap == null || fieldMap == null || _activeMovieFieldMap == fieldMap);
         }
 
-        private static void BeginNativeMoviePlaneSbs(GameObject nativeMoviePlane)
+        private static void BeginNativeMoviePlaneSbs(GameObject nativeMoviePlane, Boolean scaleForSbs)
         {
             if (nativeMoviePlane == null)
             {
@@ -274,17 +309,17 @@ namespace Memoria.FF9DepthVR
                 scaler = nativeMoviePlane.AddComponent<FF9DepthVRNativeMoviePlaneSbsScaler>();
 
             _activeNativeMoviePlaneScaler = scaler;
-            scaler.Initialize(nativeMoviePlane);
+            scaler.Initialize(nativeMoviePlane, scaleForSbs);
         }
 
-        private static void BeginNativeMovieFallback(MovieMaterial movieMaterial, GameObject nativeMoviePlane, String context, String reason)
+        private static void BeginNativeMovieFallback(MovieMaterial movieMaterial, GameObject nativeMoviePlane, String context, String reason, Boolean scaleForSbs)
         {
             if (_activeMoviePlate != null)
                 EndFieldMoviePlate(_activeMovieFieldMap);
 
             String movieKey = movieMaterial != null ? movieMaterial.movieKey : "unknown";
             Log.Message("[FF9DepthVR] " + context + ": native 2D movie remains active for movie=" + movieKey + " reason=" + reason + ".");
-            BeginNativeMoviePlaneSbs(nativeMoviePlane);
+            BeginNativeMoviePlaneSbs(nativeMoviePlane, scaleForSbs);
         }
 
         private static void EndNativeMoviePlaneSbs()
@@ -1037,7 +1072,7 @@ namespace Memoria.FF9DepthVR
 
             Material material = new Material(shader);
             material.mainTexture = colorTexture;
-            material.renderQueue = ReplacementPlateRenderQueue;
+            material.renderQueue = renderQueue >= 0 ? renderQueue : ReplacementPlateRenderQueue;
             if (material.HasProperty("_DepthTex"))
                 material.SetTexture("_DepthTex", depthTexture);
             if (material.HasProperty("_ColorTexel"))
@@ -1186,6 +1221,76 @@ namespace Memoria.FF9DepthVR
         private static Boolean HasDepthReplacement(global::FieldMap fieldMap)
         {
             return fieldMap != null && FindChildRecursive(fieldMap.transform, RootName) != null;
+        }
+
+        internal static Boolean TryGetDepthReplacementPlateSize(global::FieldMap fieldMap, out Single width, out Single height)
+        {
+            width = 0f;
+            height = 0f;
+            if (fieldMap == null)
+                return false;
+
+            Transform depthRoot = FindChildRecursive(fieldMap.transform, RootName);
+            if (depthRoot == null)
+                return false;
+
+            Transform plateParent = GetPlateParent(fieldMap);
+            MeshFilter[] filters = depthRoot.GetComponentsInChildren<MeshFilter>(true);
+            if (filters == null || filters.Length == 0)
+                return false;
+
+            Boolean hasPoint = false;
+            Single minX = Single.MaxValue;
+            Single maxX = Single.MinValue;
+            Single minY = Single.MaxValue;
+            Single maxY = Single.MinValue;
+            for (Int32 i = 0; i < filters.Length; i++)
+            {
+                MeshFilter filter = filters[i];
+                if (filter == null || filter.sharedMesh == null)
+                    continue;
+
+                Bounds bounds = filter.sharedMesh.bounds;
+                Vector3 min = bounds.min;
+                Vector3 max = bounds.max;
+                Vector3[] corners = new Vector3[8]
+                {
+                    new Vector3(min.x, min.y, min.z),
+                    new Vector3(max.x, min.y, min.z),
+                    new Vector3(min.x, max.y, min.z),
+                    new Vector3(max.x, max.y, min.z),
+                    new Vector3(min.x, min.y, max.z),
+                    new Vector3(max.x, min.y, max.z),
+                    new Vector3(min.x, max.y, max.z),
+                    new Vector3(max.x, max.y, max.z)
+                };
+
+                for (Int32 c = 0; c < corners.Length; c++)
+                {
+                    Vector3 world = filter.transform.TransformPoint(corners[c]);
+                    Vector3 local = plateParent != null ? plateParent.InverseTransformPoint(world) : world;
+                    if (!IsFinite(local.x) || !IsFinite(local.y))
+                        continue;
+
+                    hasPoint = true;
+                    minX = Mathf.Min(minX, local.x);
+                    maxX = Mathf.Max(maxX, local.x);
+                    minY = Mathf.Min(minY, local.y);
+                    maxY = Mathf.Max(maxY, local.y);
+                }
+            }
+
+            if (!hasPoint)
+                return false;
+
+            width = maxX - minX;
+            height = maxY - minY;
+            return IsFinite(width) && IsFinite(height) && width > 0.001f && height > 0.001f && width < 100000f && height < 100000f;
+        }
+
+        private static Boolean IsFinite(Single value)
+        {
+            return !Single.IsNaN(value) && !Single.IsInfinity(value);
         }
 
         private static void SetOriginalBackgroundVisible(global::FieldMap fieldMap, Boolean visible)
@@ -1601,6 +1706,7 @@ namespace Memoria.FF9DepthVR
         private Vector2 _lookFocusUv = new Vector2(0.5f, 0.5f);
         private Vector2 _actorLookUv = new Vector2(0.5f, 0.5f);
         private Boolean _hasActorLookTarget;
+        private Boolean _centeredPlateCoordinates;
         private const Single ControllerLookDeadzone = 0.18f;
         private const Single ControllerLookMouseWakePixels = 2f;
         private static readonly Boolean EnableCpuDofFallback = false;
@@ -1621,6 +1727,11 @@ namespace Memoria.FF9DepthVR
             _colorTexture = colorTexture;
             _depthTexture = depthTexture;
             InitializeCpuDof();
+        }
+
+        public void SetCenteredPlateCoordinates(Boolean centered)
+        {
+            _centeredPlateCoordinates = centered;
         }
 
         public void ReplaceSource(Mesh mesh, Vector3[] baseVertices, Color[] depthColors, Single width, Single height, Texture2D colorTexture, Texture2D depthTexture)
@@ -1987,17 +2098,18 @@ namespace Memoria.FF9DepthVR
 
         public Vector2 PlateOffset(Single plateX, Single plateY, Single depthCenter)
         {
-            Single edgeFadeX = Mathf.Clamp01(Mathf.Min(plateX, _width - plateX) / Mathf.Max(1f, _width * 0.08f));
-            Single edgeFadeY = Mathf.Clamp01(Mathf.Min(plateY, _height - plateY) / Mathf.Max(1f, _height * 0.08f));
-            Single edgeFade = Mathf.Min(edgeFadeX, edgeFadeY);
-            return new Vector2(depthCenter * _currentOffsetX * edgeFade, depthCenter * _currentOffsetY * edgeFade);
+            Vector2 transformed = PlatePoint(plateX, plateY, depthCenter);
+            return new Vector2(transformed.x - plateX, transformed.y - plateY);
         }
 
         public Vector2 PlatePoint(Single plateX, Single plateY, Single depthCenter)
         {
-            Vector2 offset = PlateOffset(plateX, plateY, depthCenter);
-            Single x = plateX + offset.x;
-            Single y = plateY + offset.y;
+            Vector2 plateSpace = ToPlateSpace(plateX, plateY);
+            Single edgeFadeX = Mathf.Clamp01(Mathf.Min(plateSpace.x, _width - plateSpace.x) / Mathf.Max(1f, _width * 0.08f));
+            Single edgeFadeY = Mathf.Clamp01(Mathf.Min(plateSpace.y, _height - plateSpace.y) / Mathf.Max(1f, _height * 0.08f));
+            Single edgeFade = Mathf.Min(edgeFadeX, edgeFadeY);
+            Single x = plateSpace.x + depthCenter * _currentOffsetX * edgeFade;
+            Single y = plateSpace.y + depthCenter * _currentOffsetY * edgeFade;
             if (_smoothedZoom > 0.0001f)
             {
                 Single pivotX = _focusPivotX * _width;
@@ -2006,7 +2118,7 @@ namespace Memoria.FF9DepthVR
                 x = pivotX + (x - pivotX) * scale;
                 y = pivotY + (y - pivotY) * scale;
             }
-            return new Vector2(x, y);
+            return FromPlateSpace(x, y);
         }
 
         public Vector2 PlateTransformOffset(Single plateX, Single plateY, Single depthCenter)
@@ -2033,6 +2145,20 @@ namespace Memoria.FF9DepthVR
             _focusBiasX = 0f;
             _focusBiasY = 0f;
             _focusZoom = 0f;
+        }
+
+        private Vector2 ToPlateSpace(Single plateX, Single plateY)
+        {
+            if (!_centeredPlateCoordinates)
+                return new Vector2(plateX, plateY);
+            return new Vector2(plateX + _width * 0.5f, _height * 0.5f - plateY);
+        }
+
+        private Vector2 FromPlateSpace(Single plateX, Single plateY)
+        {
+            if (!_centeredPlateCoordinates)
+                return new Vector2(plateX, plateY);
+            return new Vector2(plateX - _width * 0.5f, _height * 0.5f - plateY);
         }
     }
 
@@ -2925,15 +3051,17 @@ namespace Memoria.FF9DepthVR
                 return;
 
             Int32 warped = 0;
+            Boolean warpEnabled = FF9DepthVRFieldRenderer.PlateVisible && FF9DepthVRFieldRenderer.ForegroundMaskDepthWarpEnabled;
             for (Int32 i = 0; i < _entries.Length; i++)
             {
                 MeshEntry entry = _entries[i];
                 if (entry == null || entry.Mesh == null || entry.Transform == null || entry.BaseVertices == null || entry.WorkingVertices == null)
                     continue;
 
-                if (!FF9DepthVRFieldRenderer.PlateVisible)
+                if (!warpEnabled)
                 {
                     entry.Mesh.vertices = entry.BaseVertices;
+                    entry.Mesh.RecalculateBounds();
                     continue;
                 }
 
@@ -2955,7 +3083,7 @@ namespace Memoria.FF9DepthVR
             if (_logTimer <= 0f)
             {
                 _logTimer = 5f;
-                Log.Message("[FF9DepthVR] Mask warp meshes=" + warped + " vertices=" + _lastWarpedVertices);
+                Log.Message("[FF9DepthVR] Mask warp enabled=" + warpEnabled + " meshes=" + warped + " vertices=" + _lastWarpedVertices);
             }
         }
 
@@ -3277,6 +3405,7 @@ namespace Memoria.FF9DepthVR
 
         private Camera _mainCamera;
         private Camera _rightCamera;
+        private FF9DepthVRBattleRightEyePostRenderBridge _rightEyePostRenderBridge;
         private Rect _mainRect = new Rect(0f, 0f, 1f, 1f);
         private Single _mainAspect = 1f;
         private Vector3 _basePosition;
@@ -3373,6 +3502,7 @@ namespace Memoria.FF9DepthVR
             GameObject go = new GameObject("FF9DepthVR_SBS_RightBattleCamera");
             go.transform.parent = _mainCamera.transform.parent;
             _rightCamera = go.AddComponent<Camera>();
+            _rightEyePostRenderBridge = go.AddComponent<FF9DepthVRBattleRightEyePostRenderBridge>();
             _rightCamera.enabled = false;
             Log.Message("[FF9DepthVR] SBS right-eye battle camera created.");
         }
@@ -3417,6 +3547,8 @@ namespace Memoria.FF9DepthVR
             _rightCamera.transform.position = rightEye;
             _rightCamera.transform.rotation = Quaternion.LookRotation((target - rightEye).normalized, up);
             _rightCamera.transform.localScale = _baseScale;
+            if (_rightEyePostRenderBridge != null)
+                _rightEyePostRenderBridge.Configure(_rightCamera, _mainCamera.GetComponent<BattleRainRenderer>());
         }
 
         private void RegisterInstance()
@@ -3483,9 +3615,10 @@ namespace Memoria.FF9DepthVR
                 return;
             Destroy(_rightCamera.gameObject);
             _rightCamera = null;
+            _rightEyePostRenderBridge = null;
         }
 
-        private static Boolean IsBattleScene()
+        internal static Boolean IsBattleScene()
         {
             String scene = Application.loadedLevelName;
             return String.Equals(scene, "BattleMap", StringComparison.Ordinal) || String.Equals(scene, "BattleMapDebug", StringComparison.Ordinal);
@@ -3494,6 +3627,54 @@ namespace Memoria.FF9DepthVR
         private static Boolean IsFinite(Single value)
         {
             return !Single.IsNaN(value) && !Single.IsInfinity(value);
+        }
+    }
+
+    public sealed class FF9DepthVRBattleRightEyePostRenderBridge : MonoBehaviour
+    {
+        private Camera _rightCamera;
+        private BattleRainRenderer _sourceRainRenderer;
+
+        public void Configure(Camera rightCamera, BattleRainRenderer sourceRainRenderer)
+        {
+            _rightCamera = rightCamera;
+            _sourceRainRenderer = sourceRainRenderer;
+        }
+
+        private void OnPostRender()
+        {
+            if (!FF9DepthVRFieldRenderer.SbsActive || !FF9DepthVRBattleStereo.IsBattleScene())
+                return;
+            if (_rightCamera == null)
+                _rightCamera = GetComponent<Camera>();
+            if (_rightCamera == null || !_rightCamera.enabled)
+                return;
+
+            Single savedWidthOffset = SFX.screenWidthOffset;
+            Single savedWidth = SFX.screenWidth;
+            Single savedHeight = SFX.screenHeight;
+
+            try
+            {
+                if (_sourceRainRenderer != null)
+                    _sourceRainRenderer.nf_BbgRain();
+
+                SFX.screenWidthOffset = Screen.width * 0.5f;
+                SFX.screenWidth = Screen.width * 0.5f;
+                SFX.screenHeight = Screen.height;
+                SFX.PostRender();
+                UnifiedBattleSequencer.LoopRender();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[FF9DepthVR] Failed to mirror battle post-render effects for SBS right eye.");
+            }
+            finally
+            {
+                SFX.screenWidthOffset = savedWidthOffset;
+                SFX.screenWidth = savedWidth;
+                SFX.screenHeight = savedHeight;
+            }
         }
     }
 
@@ -3778,6 +3959,8 @@ namespace Memoria.FF9DepthVR
                 .Append(" depth=").Append(FloatText(camera.depth))
                 .Append(" aspect=").Append(FloatText(camera.aspect))
                 .Append(" fov=").Append(FloatText(camera.fieldOfView))
+                .Append(" ortho=").Append(camera.orthographic)
+                .Append(" orthoSize=").Append(FloatText(camera.orthographicSize))
                 .Append(" cull=").Append(camera.cullingMask)
                 .Append(" rect=").Append(RectText(camera.rect))
                 .Append(" pixel=").Append(RectText(camera.pixelRect))
@@ -3807,9 +3990,10 @@ namespace Memoria.FF9DepthVR
         private Transform _target;
         private Vector3 _baseScale = Vector3.one;
         private Boolean _hasBaseScale;
+        private Boolean _scaleForSbs;
         private Boolean _scaled;
 
-        public void Initialize(GameObject nativeMoviePlane)
+        public void Initialize(GameObject nativeMoviePlane, Boolean scaleForSbs)
         {
             if (nativeMoviePlane == null)
                 return;
@@ -3820,6 +4004,7 @@ namespace Memoria.FF9DepthVR
             _target = nativeMoviePlane.transform;
             _baseScale = _target.localScale;
             _hasBaseScale = true;
+            _scaleForSbs = scaleForSbs;
             _scaled = false;
             enabled = true;
             ApplyScale();
@@ -3852,7 +4037,7 @@ namespace Memoria.FF9DepthVR
             if (_target == null || !_hasBaseScale)
                 return;
 
-            if (FF9DepthVRFieldRenderer.SbsActive)
+            if (FF9DepthVRFieldRenderer.SbsActive && _scaleForSbs)
             {
                 _target.localScale = new Vector3(_baseScale.x * 0.5f, _baseScale.y, _baseScale.z);
                 _scaled = true;
@@ -4058,6 +4243,39 @@ namespace Memoria.FF9DepthVR
     {
         internal const Int32 MovieColumns = 96;
         internal const Int32 MovieRows = 54;
+        private const Single StandaloneFrameOverscanX = 0.4f;
+        private const Single StandaloneFrameOverscanY = 0.12f;
+        private const Single StandaloneDepthEdgeFade = 0.12f;
+
+        private struct MoviePlateFrame
+        {
+            public Single MinX;
+            public Single MaxX;
+            public Single MinY;
+            public Single MaxY;
+            public Single CenterZ;
+            public Single NearZ;
+            public Single FarZ;
+
+            public Single Width => Mathf.Max(0f, MaxX - MinX);
+            public Single Height => Mathf.Max(0f, MaxY - MinY);
+
+            public static MoviePlateFrame Centered(Single width, Single height, Single centerZ, Single nearZ, Single farZ)
+            {
+                Single halfWidth = Mathf.Max(0.001f, width) * 0.5f;
+                Single halfHeight = Mathf.Max(0.001f, height) * 0.5f;
+                return new MoviePlateFrame
+                {
+                    MinX = -halfWidth,
+                    MaxX = halfWidth,
+                    MinY = -halfHeight,
+                    MaxY = halfHeight,
+                    CenterZ = centerZ,
+                    NearZ = nearZ,
+                    FarZ = farZ
+                };
+            }
+        }
 
         private global::FieldMap _fieldMap;
         private Camera _movieCamera;
@@ -4081,8 +4299,10 @@ namespace Memoria.FF9DepthVR
         private Int32 _lastFrame = -1;
         private Boolean _loggedFirstFrame;
         private Boolean _loggedMissingFrames;
+        private Boolean _loggedStandaloneFrame;
         private Boolean _hidNativeMoviePlane;
         private Boolean _hidFieldDepthReplacement;
+        private Boolean _hasDepthSurfaceFrame;
         private Boolean _standaloneMode;
         private Boolean _isActive;
 
@@ -4114,8 +4334,10 @@ namespace Memoria.FF9DepthVR
             _depthTextureFromMovieStream = false;
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
+            _loggedStandaloneFrame = false;
             _hidNativeMoviePlane = false;
             _hidFieldDepthReplacement = false;
+            _hasDepthSurfaceFrame = false;
             _isActive = true;
             enabled = true;
             Log.Message("[FF9DepthVR] Field movie BGPlate renderer initialized.");
@@ -4147,8 +4369,10 @@ namespace Memoria.FF9DepthVR
             _depthTextureFromMovieStream = false;
             _loggedFirstFrame = false;
             _loggedMissingFrames = false;
+            _loggedStandaloneFrame = false;
             _hidNativeMoviePlane = false;
             _hidFieldDepthReplacement = false;
+            _hasDepthSurfaceFrame = false;
             _isActive = true;
             enabled = true;
             Log.Message("[FF9DepthVR] Standalone movie BGPlate renderer initialized.");
@@ -4164,8 +4388,9 @@ namespace Memoria.FF9DepthVR
             if ((!_standaloneMode && _fieldMap == null) || (_standaloneMode && _movieCamera == null) || _movieMaterial == null)
                 return;
 
-            ApplyStandaloneNativeMoviePlaneState();
+            ApplyStandaloneDepthSurfaceState();
             SyncRootParent();
+            ApplyFieldMovieDepthSurfaceState();
 
             String movieKey = _movieMaterial.movieKey;
             if (String.IsNullOrEmpty(movieKey))
@@ -4210,6 +4435,7 @@ namespace Memoria.FF9DepthVR
                 .Append(" sbs=").Append(FF9DepthVRFieldRenderer.SbsActive)
                 .Append(" vr=").Append(FF9DepthVRFieldRenderer.VrCaptureEnabled)
                 .Append(" standalone=").Append(_standaloneMode)
+                .Append(" depthSurface=").Append(_hasDepthSurfaceFrame)
                 .Append(" active=").Append(_isActive)
                 .AppendLine();
 
@@ -4284,8 +4510,10 @@ namespace Memoria.FF9DepthVR
             _movieCameraOriginalCullingMask = 0;
             _movieMaterial = null;
             _depthMoviePath = null;
+            _hasDepthSurfaceFrame = false;
             _standaloneMode = false;
             _hidFieldDepthReplacement = false;
+            _loggedStandaloneFrame = false;
             _isActive = false;
             enabled = false;
         }
@@ -4351,26 +4579,28 @@ namespace Memoria.FF9DepthVR
             Single width;
             Single height;
             Single depthScale;
+            MoviePlateFrame cameraFrame = default(MoviePlateFrame);
             if (_standaloneMode)
             {
-                CalculateStandalonePlateSize(_movieMaterial.Width, _movieMaterial.Height, out width, out height);
+                CalculateStandalonePlateFrame(_movieMaterial.Width, _movieMaterial.Height, out cameraFrame);
+                width = cameraFrame.Width;
+                height = cameraFrame.Height;
                 depthScale = FF9DepthVRFieldRenderer.MovieStandaloneDepthScale;
             }
             else
             {
-                width = Mathf.Max(1, _movieMaterial.Width) * FF9DepthVRFieldRenderer.DefaultSourceScale;
-                height = Mathf.Max(1, _movieMaterial.Height) * FF9DepthVRFieldRenderer.DefaultSourceScale;
+                CalculateFieldMoviePlateSize(_movieMaterial.Width, _movieMaterial.Height, out width, out height);
                 depthScale = FF9DepthVRFieldRenderer.DefaultGeometryDepthScale;
             }
 
             EnsureRoot(null, depth, width, height, _movieMaterial.Material);
             if (_meshRenderer != null)
-                _meshRenderer.enabled = !_standaloneMode;
+                _meshRenderer.enabled = true;
             Vector3[] vertices;
             Vector2[] uvs;
             Color[] colors;
             Int32[] triangles;
-            BuildMovieMesh(depth, width, height, depthScale, _standaloneMode, out vertices, out uvs, out colors, out triangles);
+            BuildMovieMesh(depth, width, height, depthScale, _standaloneMode, cameraFrame, out vertices, out uvs, out colors, out triangles);
             _mesh.Clear();
             _mesh.vertices = vertices;
             _mesh.uv = uvs;
@@ -4380,10 +4610,14 @@ namespace Memoria.FF9DepthVR
             _mesh.RecalculateBounds();
             if (_parallax != null)
                 _parallax.ReplaceSource(_mesh, vertices, colors, width, height, null, depth);
-            if (!_standaloneMode)
+            _hasDepthSurfaceFrame = true;
+            if (_standaloneMode)
             {
-                HideFieldDepthReplacement();
-                HideNativeMoviePlane();
+                ApplyStandaloneDepthSurfaceState();
+            }
+            else
+            {
+                ApplyFieldMovieDepthSurfaceState();
             }
 
             if (_colorTexture != null)
@@ -4439,25 +4673,27 @@ namespace Memoria.FF9DepthVR
             Single width;
             Single height;
             Single depthScale;
+            MoviePlateFrame cameraFrame = default(MoviePlateFrame);
             if (_standaloneMode)
             {
-                CalculateStandalonePlateSize(color, out width, out height);
+                CalculateStandalonePlateFrame(color, out cameraFrame);
+                width = cameraFrame.Width;
+                height = cameraFrame.Height;
                 depthScale = FF9DepthVRFieldRenderer.MovieStandaloneDepthScale;
             }
             else
             {
-                width = color.width * FF9DepthVRFieldRenderer.DefaultSourceScale;
-                height = color.height * FF9DepthVRFieldRenderer.DefaultSourceScale;
+                CalculateFieldMoviePlateSize(color.width, color.height, out width, out height);
                 depthScale = FF9DepthVRFieldRenderer.DefaultGeometryDepthScale;
             }
             EnsureRoot(color, depth, width, height);
             if (_meshRenderer != null)
-                _meshRenderer.enabled = !_standaloneMode;
+                _meshRenderer.enabled = true;
             Vector3[] vertices;
             Vector2[] uvs;
             Color[] colors;
             Int32[] triangles;
-            BuildMovieMesh(depth, width, height, depthScale, _standaloneMode, out vertices, out uvs, out colors, out triangles);
+            BuildMovieMesh(depth, width, height, depthScale, _standaloneMode, cameraFrame, out vertices, out uvs, out colors, out triangles);
             _mesh.Clear();
             _mesh.vertices = vertices;
             _mesh.uv = uvs;
@@ -4475,10 +4711,14 @@ namespace Memoria.FF9DepthVR
             }
             if (_parallax != null)
                 _parallax.ReplaceSource(_mesh, vertices, colors, width, height, color, depth);
-            if (!_standaloneMode)
+            _hasDepthSurfaceFrame = true;
+            if (_standaloneMode)
             {
-                HideFieldDepthReplacement();
-                HideNativeMoviePlane();
+                ApplyStandaloneDepthSurfaceState();
+            }
+            else
+            {
+                ApplyFieldMovieDepthSurfaceState();
             }
 
             if (_colorTexture != null)
@@ -4531,34 +4771,228 @@ namespace Memoria.FF9DepthVR
 
         private void CalculateStandalonePlateSize(Texture2D color, out Single width, out Single height)
         {
-            Int32 colorWidth = color != null ? color.width : 0;
-            Int32 colorHeight = color != null ? color.height : 0;
-            CalculateStandalonePlateSize(colorWidth, colorHeight, out width, out height);
+            MoviePlateFrame frame;
+            CalculateStandalonePlateFrame(color, out frame);
+            width = frame.Width;
+            height = frame.Height;
         }
 
         private void CalculateStandalonePlateSize(Int32 colorWidth, Int32 colorHeight, out Single width, out Single height)
         {
+            MoviePlateFrame frame;
+            CalculateStandalonePlateFrame(colorWidth, colorHeight, out frame);
+            width = frame.Width;
+            height = frame.Height;
+        }
+
+        private void CalculateFieldMoviePlateSize(Int32 colorWidth, Int32 colorHeight, out Single width, out Single height)
+        {
+            if (FF9DepthVRFieldRenderer.TryGetDepthReplacementPlateSize(_fieldMap, out width, out height))
+                return;
+
+            width = Mathf.Max(1, colorWidth) * FF9DepthVRFieldRenderer.DefaultSourceScale;
+            height = Mathf.Max(1, colorHeight) * FF9DepthVRFieldRenderer.DefaultSourceScale;
+        }
+
+        private void CalculateStandalonePlateFrame(Texture2D color, out MoviePlateFrame frame)
+        {
+            Int32 colorWidth = color != null ? color.width : 0;
+            Int32 colorHeight = color != null ? color.height : 0;
+            CalculateStandalonePlateFrame(colorWidth, colorHeight, out frame);
+        }
+
+        private void CalculateStandalonePlateFrame(Int32 colorWidth, Int32 colorHeight, out MoviePlateFrame frame)
+        {
+            CalculateFallbackStandalonePlateFrame(colorWidth, colorHeight, out frame);
+            if (!_loggedStandaloneFrame)
+            {
+                _loggedStandaloneFrame = true;
+                String projection = _movieCamera != null && _movieCamera.orthographic ? "orthographic" : "perspective";
+                Log.Message("[FF9DepthVR] Standalone movie BGPlate using camera " + projection + " frame size=" + FloatText(frame.Width) + "x" + FloatText(frame.Height) + " centerZ=" + FloatText(frame.CenterZ) + " clip=" + FloatText(frame.NearZ) + "-" + FloatText(frame.FarZ) + ".");
+            }
+        }
+
+        private void CalculateFallbackStandalonePlateFrame(Int32 colorWidth, Int32 colorHeight, out MoviePlateFrame frame)
+        {
             Single distance = FF9DepthVRFieldRenderer.MoviePlateDistance;
-            Single fov = _movieCamera != null ? Mathf.Max(1f, _movieCamera.fieldOfView) : 60f;
-            Single viewHeight = 2f * distance * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
+            Single viewHeight;
+            if (_movieCamera != null && _movieCamera.orthographic)
+            {
+                viewHeight = Mathf.Max(0.001f, _movieCamera.orthographicSize) * 2f;
+            }
+            else
+            {
+                Single fov = _movieCamera != null ? Mathf.Max(1f, _movieCamera.fieldOfView) : 60f;
+                viewHeight = 2f * distance * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
+            }
             Single viewAspect = FF9DepthVRMovieSbsStereo.GetRenderAspect(_movieCamera);
             Single viewWidth = viewHeight * Mathf.Max(0.01f, viewAspect);
             Single videoAspect = colorHeight > 0 ? (Single)Mathf.Max(1, colorWidth) / colorHeight : 4f / 3f;
 
             if (FF9DepthVRFieldRenderer.SbsActive)
             {
-                width = viewWidth;
-                height = viewHeight;
+                frame = MoviePlateFrame.Centered(viewWidth, viewHeight, distance, MovieCameraNearZ(), MovieCameraFarZ());
                 return;
             }
 
-            height = viewHeight;
-            width = height * videoAspect;
+            Single height = viewHeight;
+            Single width = height * videoAspect;
             if (width > viewWidth)
             {
                 width = viewWidth;
                 height = width / videoAspect;
             }
+            frame = MoviePlateFrame.Centered(width, height, distance, MovieCameraNearZ(), MovieCameraFarZ());
+        }
+
+        private static MoviePlateFrame ExpandCameraFrame(MoviePlateFrame frame, Single fraction)
+        {
+            Single paddingX = frame.Width * Mathf.Max(0f, fraction);
+            Single paddingY = frame.Height * Mathf.Max(0f, fraction);
+            frame.MinX -= paddingX;
+            frame.MaxX += paddingX;
+            frame.MinY -= paddingY;
+            frame.MaxY += paddingY;
+            return frame;
+        }
+
+        private Boolean TryCalculateNativeMoviePlaneFrame(out MoviePlateFrame frame)
+        {
+            frame = default(MoviePlateFrame);
+            if (_sourceRenderer == null || _movieCamera == null)
+                return false;
+
+            MeshFilter meshFilter = _sourceRenderer.GetComponent<MeshFilter>();
+            if (meshFilter != null && meshFilter.sharedMesh != null && TryBuildCameraFrameFromLocalBounds(meshFilter.sharedMesh.bounds, _sourceRenderer.transform, out frame))
+                return true;
+
+            return TryBuildCameraFrameFromWorldBounds(_sourceRenderer.bounds, out frame);
+        }
+
+        private Boolean TryBuildCameraFrameFromLocalBounds(Bounds bounds, Transform sourceTransform, out MoviePlateFrame frame)
+        {
+            frame = default(MoviePlateFrame);
+            if (sourceTransform == null || _movieCamera == null)
+                return false;
+
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            Vector3[] corners = new Vector3[8]
+            {
+                new Vector3(min.x, min.y, min.z),
+                new Vector3(max.x, min.y, min.z),
+                new Vector3(min.x, max.y, min.z),
+                new Vector3(max.x, max.y, min.z),
+                new Vector3(min.x, min.y, max.z),
+                new Vector3(max.x, min.y, max.z),
+                new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, max.y, max.z)
+            };
+            return TryBuildCameraFrameFromWorldCorners(corners, sourceTransform, out frame);
+        }
+
+        private Boolean TryBuildCameraFrameFromWorldBounds(Bounds bounds, out MoviePlateFrame frame)
+        {
+            frame = default(MoviePlateFrame);
+            if (_movieCamera == null)
+                return false;
+
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            Vector3[] corners = new Vector3[8]
+            {
+                new Vector3(min.x, min.y, min.z),
+                new Vector3(max.x, min.y, min.z),
+                new Vector3(min.x, max.y, min.z),
+                new Vector3(max.x, max.y, min.z),
+                new Vector3(min.x, min.y, max.z),
+                new Vector3(max.x, min.y, max.z),
+                new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, max.y, max.z)
+            };
+            return TryBuildCameraFrameFromWorldCorners(corners, null, out frame);
+        }
+
+        private Boolean TryBuildCameraFrameFromWorldCorners(Vector3[] corners, Transform sourceTransform, out MoviePlateFrame frame)
+        {
+            frame = default(MoviePlateFrame);
+            if (corners == null || corners.Length == 0 || _movieCamera == null)
+                return false;
+
+            Single minX = Single.MaxValue;
+            Single maxX = Single.MinValue;
+            Single minY = Single.MaxValue;
+            Single maxY = Single.MinValue;
+            Single minZ = Single.MaxValue;
+            Single maxZ = Single.MinValue;
+            Transform cameraTransform = _movieCamera.transform;
+            for (Int32 i = 0; i < corners.Length; i++)
+            {
+                Vector3 world = sourceTransform != null ? sourceTransform.TransformPoint(corners[i]) : corners[i];
+                Vector3 cameraPoint = cameraTransform.InverseTransformPoint(world);
+                if (!IsFinite(cameraPoint))
+                    return false;
+
+                minX = Mathf.Min(minX, cameraPoint.x);
+                maxX = Mathf.Max(maxX, cameraPoint.x);
+                minY = Mathf.Min(minY, cameraPoint.y);
+                maxY = Mathf.Max(maxY, cameraPoint.y);
+                minZ = Mathf.Min(minZ, cameraPoint.z);
+                maxZ = Mathf.Max(maxZ, cameraPoint.z);
+            }
+
+            Single nearZ = MovieCameraNearZ();
+            Single farZ = MovieCameraFarZ();
+            Single centerZ = Mathf.Clamp((minZ + maxZ) * 0.5f, nearZ, farZ);
+            frame = new MoviePlateFrame
+            {
+                MinX = minX,
+                MaxX = maxX,
+                MinY = minY,
+                MaxY = maxY,
+                CenterZ = centerZ,
+                NearZ = nearZ,
+                FarZ = farZ
+            };
+            return IsSaneCameraFrame(frame);
+        }
+
+        private Boolean IsSaneCameraFrame(MoviePlateFrame frame)
+        {
+            if (!IsFinite(frame.MinX) || !IsFinite(frame.MaxX) || !IsFinite(frame.MinY) || !IsFinite(frame.MaxY) || !IsFinite(frame.CenterZ) || !IsFinite(frame.NearZ) || !IsFinite(frame.FarZ))
+                return false;
+            if (frame.Width < 0.001f || frame.Height < 0.001f)
+                return false;
+            if (frame.FarZ <= frame.NearZ)
+                return false;
+            if (Mathf.Abs(frame.CenterZ) > 10000f || frame.Width > 10000f || frame.Height > 10000f)
+                return false;
+            return true;
+        }
+
+        private Single MovieCameraNearZ()
+        {
+            if (_movieCamera == null)
+                return 0.005f;
+            return Mathf.Max(0.001f, _movieCamera.nearClipPlane + 0.005f);
+        }
+
+        private Single MovieCameraFarZ()
+        {
+            Single nearZ = MovieCameraNearZ();
+            if (_movieCamera == null)
+                return Mathf.Max(nearZ + 0.01f, 1000f);
+            return Mathf.Max(nearZ + 0.01f, _movieCamera.farClipPlane - 0.005f);
+        }
+
+        private static Boolean IsFinite(Vector3 vector)
+        {
+            return IsFinite(vector.x) && IsFinite(vector.y) && IsFinite(vector.z);
+        }
+
+        private static Boolean IsFinite(Single value)
+        {
+            return !Single.IsNaN(value) && !Single.IsInfinity(value);
         }
 
         private void EnsureRoot(Texture2D color, Texture2D depth, Single width, Single height)
@@ -4573,7 +5007,7 @@ namespace Memoria.FF9DepthVR
                 if (overrideMaterial != null && _meshRenderer != null && _meshRenderer.sharedMaterial != overrideMaterial)
                 {
                     _material = overrideMaterial;
-                    _material.renderQueue = FF9DepthVRFieldRenderer.ReplacementPlateRenderQueue;
+                    ConfigureMovieBgPlateMaterial(_material);
                     _meshRenderer.sharedMaterial = _material;
                 }
                 else if (overrideMaterial == null && color != null && _meshRenderer != null && _movieMaterial != null && _material == _movieMaterial.Material)
@@ -4581,6 +5015,7 @@ namespace Memoria.FF9DepthVR
                     _material = FF9DepthVRFieldRenderer.CreateMoviePlateMaterial(color, depth);
                     _meshRenderer.sharedMaterial = _material;
                 }
+                EnsureParallax(width, height, color, depth);
                 return;
             }
 
@@ -4593,17 +5028,59 @@ namespace Memoria.FF9DepthVR
             _meshRenderer = meshRenderer;
             meshFilter.sharedMesh = _mesh;
             _material = overrideMaterial != null ? overrideMaterial : FF9DepthVRFieldRenderer.CreateMoviePlateMaterial(color, depth);
-            if (_material != null)
-                _material.renderQueue = FF9DepthVRFieldRenderer.ReplacementPlateRenderQueue;
+            ConfigureMovieBgPlateMaterial(_material);
             meshRenderer.sharedMaterial = _material;
             if (_standaloneMode)
                 meshRenderer.enabled = false;
-            if (!_standaloneMode)
-            {
-                _parallax = _root.AddComponent<FF9DepthVRParallax>();
-                _parallax.Initialize(_mesh, new Vector3[(MovieColumns + 1) * (MovieRows + 1)], new Color[(MovieColumns + 1) * (MovieRows + 1)], width, height, FF9DepthVRFieldRenderer.DefaultParallaxStrength, FF9DepthVRFieldRenderer.DefaultIdleParallaxStrength, _material, color, depth);
-            }
+            EnsureParallax(width, height, color, depth);
             Log.Message("[FF9DepthVR] " + (_standaloneMode ? "Standalone" : "Field") + " movie BGPlate mesh created shader=" + (_material != null && _material.shader != null ? _material.shader.name : "null") + ".");
+        }
+
+        private static void ConfigureMovieBgPlateMaterial(Material material)
+        {
+            if (material == null)
+                return;
+
+            material.renderQueue = FF9DepthVRFieldRenderer.ReplacementPlateRenderQueue;
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.SetInt("_Cull", (Int32)UnityEngine.Rendering.CullMode.Off);
+            material.SetInt("_ZWrite", 0);
+            material.SetInt("_ZTest", (Int32)UnityEngine.Rendering.CompareFunction.Always);
+            material.SetInt("_SrcBlend", (Int32)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetInt("_DstBlend", (Int32)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", Color.white);
+            if (material.HasProperty("_TintColor"))
+                material.SetColor("_TintColor", Color.white);
+        }
+
+        private void EnsureParallax(Single width, Single height, Texture2D color, Texture2D depth)
+        {
+            if (_root == null || _mesh == null || _parallax != null)
+                return;
+
+            Single parallaxStrength = FF9DepthVRFieldRenderer.DefaultParallaxStrength;
+            Single idleStrength = FF9DepthVRFieldRenderer.DefaultIdleParallaxStrength;
+            if (_standaloneMode)
+            {
+                Single standaloneScale = StandaloneMovieParallaxScale(width, height);
+                parallaxStrength *= standaloneScale;
+                idleStrength *= standaloneScale;
+            }
+
+            _parallax = _root.AddComponent<FF9DepthVRParallax>();
+            _parallax.Initialize(_mesh, new Vector3[(MovieColumns + 1) * (MovieRows + 1)], new Color[(MovieColumns + 1) * (MovieRows + 1)], width, height, parallaxStrength, idleStrength, _material, color, depth);
+            if (_standaloneMode)
+                _parallax.SetCenteredPlateCoordinates(true);
+        }
+
+        private Single StandaloneMovieParallaxScale(Single width, Single height)
+        {
+            Single sourceWidth = _movieMaterial != null ? Mathf.Max(1f, _movieMaterial.Width) : 1280f;
+            Single sourceHeight = _movieMaterial != null ? Mathf.Max(1f, _movieMaterial.Height) : 960f;
+            Single scaleX = Mathf.Abs(width) / sourceWidth;
+            Single scaleY = Mathf.Abs(height) / sourceHeight;
+            return Mathf.Max(0.0001f, Mathf.Min(scaleX, scaleY));
         }
 
         private void SyncRootParent()
@@ -4635,19 +5112,21 @@ namespace Memoria.FF9DepthVR
             if (_fieldMap == null)
                 return;
 
-            Transform parent = FF9DepthVRFieldRenderer.GetPlateParent(_fieldMap);
-            if (parent == null)
+            Transform plateParent = FF9DepthVRFieldRenderer.GetPlateParent(_fieldMap);
+            if (plateParent == null)
                 return;
 
-            if (_root.transform.parent != parent)
-                _root.transform.parent = parent;
-            _root.transform.localPosition = Vector3.zero;
-            _root.transform.localRotation = Quaternion.identity;
+            Transform activeParent = _fieldMap.transform;
+            if (_root.transform.parent != activeParent)
+                _root.transform.SetParent(activeParent, true);
+
+            _root.transform.position = plateParent.position;
+            _root.transform.rotation = plateParent.rotation;
             _root.transform.localScale = Vector3.one;
-            FF9DepthVRFieldRenderer.SetLayerRecursive(_root, parent.gameObject.layer);
+            FF9DepthVRFieldRenderer.SetLayerRecursive(_root, plateParent.gameObject.layer);
         }
 
-        private static void BuildMovieMesh(Texture2D depthTexture, Single width, Single height, Single depthScale, Boolean centeredCameraPlate, out Vector3[] vertices, out Vector2[] uvs, out Color[] colors, out Int32[] triangles)
+        private static void BuildMovieMesh(Texture2D depthTexture, Single width, Single height, Single depthScale, Boolean centeredCameraPlate, MoviePlateFrame cameraFrame, out Vector3[] vertices, out Vector2[] uvs, out Color[] colors, out Int32[] triangles)
         {
             Int32 columns = MovieColumns;
             Int32 rows = MovieRows;
@@ -4657,22 +5136,35 @@ namespace Memoria.FF9DepthVR
             colors = new Color[vertexCount];
             for (Int32 y = 0; y <= rows; y++)
             {
-                Single v = (Single)y / rows;
-                for (Int32 x = 0; x <= columns; x++)
-                {
-                    Single u = (Single)x / columns;
-                    Int32 index = y * (columns + 1) + x;
-                    Single sampledDepth = FF9DepthVRFieldRenderer.SampleDepthValue(depthTexture, u, 1f - v);
+                    Single v = (Single)y / rows;
+                    for (Int32 x = 0; x <= columns; x++)
+                    {
+                        Single u = (Single)x / columns;
+                        Int32 index = y * (columns + 1) + x;
+                    Single geometryU = u;
+                    Single geometryV = v;
+                    Single sampleU = u;
+                    Single sampleV = v;
+                    if (centeredCameraPlate)
+                    {
+                        geometryU = -StandaloneFrameOverscanX + u * (1f + StandaloneFrameOverscanX * 2f);
+                        geometryV = -StandaloneFrameOverscanY + v * (1f + StandaloneFrameOverscanY * 2f);
+                        sampleU = Mathf.Clamp01(geometryU);
+                        sampleV = Mathf.Clamp01(geometryV);
+                    }
+                    Single sampledDepth = FF9DepthVRFieldRenderer.SampleDepthValue(depthTexture, sampleU, 1f - sampleV);
                     Single z = (sampledDepth - 0.5f) * depthScale;
+                    if (centeredCameraPlate)
+                        z *= MovieDepthEdgeWeight(sampleU, sampleV);
                     vertices[index] = centeredCameraPlate
-                        ? new Vector3((u - 0.5f) * width, (0.5f - v) * height, FF9DepthVRFieldRenderer.MoviePlateDistance + z)
+                        ? new Vector3(LerpUnclamped(cameraFrame.MinX, cameraFrame.MaxX, geometryU), LerpUnclamped(cameraFrame.MaxY, cameraFrame.MinY, geometryV), Mathf.Clamp(cameraFrame.CenterZ + z, cameraFrame.NearZ, cameraFrame.FarZ))
                         : new Vector3(u * width, v * height, z);
-                    uvs[index] = new Vector2(u, 1f - v);
+                    uvs[index] = new Vector2(sampleU, 1f - sampleV);
                     colors[index] = new Color(sampledDepth, sampledDepth, sampledDepth, 1f);
                 }
             }
 
-            triangles = new Int32[columns * rows * (centeredCameraPlate ? 12 : 6)];
+            triangles = new Int32[columns * rows * 12];
             Int32 tri = 0;
             for (Int32 y = 0; y < rows; y++)
             {
@@ -4688,17 +5180,25 @@ namespace Memoria.FF9DepthVR
                     triangles[tri++] = b;
                     triangles[tri++] = c;
                     triangles[tri++] = d;
-                    if (centeredCameraPlate)
-                    {
-                        triangles[tri++] = b;
-                        triangles[tri++] = c;
-                        triangles[tri++] = a;
-                        triangles[tri++] = d;
-                        triangles[tri++] = c;
-                        triangles[tri++] = b;
-                    }
+                    triangles[tri++] = b;
+                    triangles[tri++] = c;
+                    triangles[tri++] = a;
+                    triangles[tri++] = d;
+                    triangles[tri++] = c;
+                    triangles[tri++] = b;
                 }
             }
+        }
+
+        private static Single MovieDepthEdgeWeight(Single u, Single v)
+        {
+            Single edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(edge / StandaloneDepthEdgeFade));
+        }
+
+        private static Single LerpUnclamped(Single a, Single b, Single t)
+        {
+            return a + (b - a) * t;
         }
 
         private static Texture2D LoadPng(String path, Boolean linear)
@@ -4780,15 +5280,49 @@ namespace Memoria.FF9DepthVR
 
         private void FallbackToNativeMovie()
         {
+            _hasDepthSurfaceFrame = false;
             if (_meshRenderer != null)
                 _meshRenderer.enabled = false;
             ShowNativeMoviePlaneDuringPlayback();
             RestoreFieldDepthReplacement();
         }
 
-        private void ApplyStandaloneNativeMoviePlaneState()
+        private void ApplyFieldMovieDepthSurfaceState()
         {
-            if (!_standaloneMode || _sourceRenderer == null)
+            if (_standaloneMode)
+                return;
+
+            if (!_hasDepthSurfaceFrame || _movieMaterial == null || !_movieMaterial.GetFirstFrame)
+            {
+                if (_meshRenderer != null)
+                    _meshRenderer.enabled = false;
+                ShowNativeMoviePlaneDuringPlayback();
+                RestoreFieldDepthReplacement();
+                return;
+            }
+
+            if (_meshRenderer != null)
+                _meshRenderer.enabled = true;
+            HideFieldDepthReplacement();
+            HideNativeMoviePlane();
+        }
+
+        private void ApplyStandaloneDepthSurfaceState()
+        {
+            if (!_standaloneMode)
+                return;
+
+            if (FF9DepthVRFieldRenderer.SbsActive && _hasDepthSurfaceFrame && _meshRenderer != null)
+            {
+                _meshRenderer.enabled = true;
+                HideNativeMoviePlane();
+                return;
+            }
+
+            if (_meshRenderer != null)
+                _meshRenderer.enabled = false;
+
+            if (_sourceRenderer == null)
                 return;
 
             if (FF9DepthVRFieldRenderer.SbsActive)
@@ -4796,8 +5330,6 @@ namespace Memoria.FF9DepthVR
                 _sourceRenderer.enabled = true;
                 if (_hasSourceRendererOriginalScale)
                     _sourceRenderer.transform.localScale = new Vector3(_sourceRendererOriginalScale.x * 0.5f, _sourceRendererOriginalScale.y, _sourceRendererOriginalScale.z);
-                if (_meshRenderer != null)
-                    _meshRenderer.enabled = false;
                 _hidNativeMoviePlane = false;
             }
             else
@@ -5021,6 +5553,7 @@ namespace Memoria.FF9DepthVR
         private global::FieldMap _fieldMap;
         private Renderer _renderer;
         private Single _logTimer;
+        private GUIStyle _statusStyle;
 
         public void Initialize(global::FieldMap fieldMap, Renderer renderer)
         {
@@ -5038,8 +5571,21 @@ namespace Memoria.FF9DepthVR
             {
                 _logTimer = 5f;
                 FieldMapActor[] actors = UnityEngine.Object.FindObjectsOfType<FieldMapActor>();
-                Log.Message("[FF9DepthVR] Diagnostics actors=" + actors.Length + " plateVisible=" + FF9DepthVRFieldRenderer.PlateVisible + " sbs=" + FF9DepthVRFieldRenderer.SbsActive + " vr=" + FF9DepthVRFieldRenderer.VrCaptureEnabled);
+                Log.Message("[FF9DepthVR] Diagnostics actors=" + actors.Length + " plateVisible=" + FF9DepthVRFieldRenderer.PlateVisible + " sbs=" + FF9DepthVRFieldRenderer.SbsActive + " vr=" + FF9DepthVRFieldRenderer.VrCaptureEnabled + " maskWarp=" + FF9DepthVRFieldRenderer.ForegroundMaskDepthWarpEnabled);
             }
+        }
+
+        private void OnGUI()
+        {
+            if (_statusStyle == null)
+            {
+                _statusStyle = new GUIStyle(GUI.skin.box);
+                _statusStyle.alignment = TextAnchor.MiddleLeft;
+                _statusStyle.fontSize = 14;
+                _statusStyle.normal.textColor = Color.white;
+            }
+
+            GUI.Box(new Rect(8f, 8f, Mathf.Min(620f, Screen.width - 16f), 26f), FF9DepthVRFieldRenderer.ModeStatusText, _statusStyle);
         }
 
         private void ApplyVisibility()
