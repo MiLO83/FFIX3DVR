@@ -1,0 +1,195 @@
+{
+  "ok": true,
+  "dataSize": 228,
+  "orgPos": [
+    -1916,
+    274,
+    1622
+  ],
+  "curPos": [
+    -1916,
+    274,
+    1622
+  ],
+  "minPos": [
+    -1916,
+    274,
+    1622
+  ],
+  "maxPos": [
+    -699,
+    274,
+    2641
+  ],
+  "charPos": [
+    -1509,
+    274,
+    1963
+  ],
+  "activeFloor": 0,
+  "activeTri": 0,
+  "counts": {
+    "triangles": 2,
+    "edges": 6,
+    "animations": 0,
+    "floors": 1,
+    "normals": 0,
+    "vertices": 4
+  },
+  "offsets": {
+    "triangles": 60,
+    "edges": 140,
+    "animations": 164,
+    "floors": 164,
+    "normals": 196,
+    "vertices": 196
+  },
+  "floors": [
+    {
+      "floorFlags": 0,
+      "floorIndex": 0,
+      "orgPos": [
+        0,
+        0,
+        0
+      ],
+      "curPos": [
+        0,
+        0,
+        0
+      ],
+      "minPos": [
+        0,
+        0,
+        0
+      ],
+      "maxPos": [
+        0,
+        0,
+        0
+      ],
+      "triIndices": [
+        0,
+        1
+      ]
+    }
+  ],
+  "vertices": [
+    [
+      0,
+      0,
+      4
+    ],
+    [
+      15,
+      0,
+      1019
+    ],
+    [
+      1206,
+      0,
+      0
+    ],
+    [
+      1217,
+      0,
+      1016
+    ]
+  ],
+  "triangles": [
+    {
+      "triIndex": 0,
+      "triFlags": 1,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        0,
+        1,
+        2
+      ],
+      "edgeIndices": [
+        0,
+        1,
+        2
+      ],
+      "neighborIndices": [
+        -1,
+        -1,
+        1
+      ],
+      "center": [
+        407,
+        0,
+        341
+      ],
+      "d": 17956864,
+      "worldVertices": [
+        [
+          -1916,
+          274,
+          1626
+        ],
+        [
+          -1901,
+          274,
+          2641
+        ],
+        [
+          -710,
+          274,
+          1622
+        ]
+      ]
+    },
+    {
+      "triIndex": 1,
+      "triFlags": 1,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        2,
+        1,
+        3
+      ],
+      "edgeIndices": [
+        3,
+        4,
+        5
+      ],
+      "neighborIndices": [
+        -1,
+        0,
+        -1
+      ],
+      "center": [
+        813,
+        0,
+        678
+      ],
+      "d": 17956864,
+      "worldVertices": [
+        [
+          -710,
+          274,
+          1622
+        ],
+        [
+          -1901,
+          274,
+          2641
+        ],
+        [
+          -699,
+          274,
+          2638
+        ]
+      ]
+    }
+  ]
+}

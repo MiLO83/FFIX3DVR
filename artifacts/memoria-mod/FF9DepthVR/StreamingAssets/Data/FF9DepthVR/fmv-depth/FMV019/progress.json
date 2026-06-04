@@ -1,0 +1,11 @@
+{
+  "status": "complete",
+  "updatedAt": "2026-05-31T01:40:06.747905+00:00",
+  "movieKey": "FMV019",
+  "frames": 471,
+  "done": 471,
+  "failed": 0,
+  "skipped": 0,
+  "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\FMV019\\spec.json",
+  "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\FMV019\\FMV019_depth.bytes"
+}

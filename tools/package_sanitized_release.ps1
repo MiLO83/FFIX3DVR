@@ -49,7 +49,13 @@ function Write-MemoriaFileList([string]$modPath) {
             $relative = [System.IO.Path]::GetFullPath($_.FullName) -replace "^$escaped", ""
             Convert-ToMemoriaFileListEntry $relative
         } |
-        Where-Object { $_ -and ($_ -notmatch "source_plate|field_erp|\.ply|\.ksplat|\.splat") } |
+        Where-Object {
+            $_ -and
+            ($_ -notmatch "source_plate|field_erp|\.ply|\.ksplat|\.splat") -and
+            ($_ -notmatch "Assembly-CSharp\.dll") -and
+            ($_ -notmatch "(^|/)FF9_Data(/|$)") -and
+            ($_ -notmatch "(^|/)logs(/|$)|\.log$")
+        } |
         Sort-Object -Unique
     Set-Content -Path (Join-Path $modPath "ModFileList.txt") -Value $entries -Encoding UTF8
 }
@@ -62,7 +68,7 @@ if (Test-Path $zip) { Remove-Item -LiteralPath $zip -Force }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 @"
-FF9DepthVR sanitized depth/dev package
+FF9DepthVR sanitized alpha package
 
 This package intentionally excludes copyrighted/color Final Fantasy IX background plates:
 - source_plate*.png
@@ -71,19 +77,21 @@ This package intentionally excludes copyrighted/color Final Fantasy IX backgroun
 - ERP/outpainted color panoramas
 - gaussian splat/PLY color assets
 - debug color plate variants
+- raw Assembly-CSharp.dll binaries
 
 Kept:
 - generated depth maps
 - walkmesh/camera JSON
 - manifests
 - viewer/source code
-- tools and docs
+- docs
 - FF9DepthVR patch source file
+- runtime IPS patch installer for a supported local Memoria DLL
 
-To build or run the full in-game mod, regenerate or provide source plates locally from a legally owned Steam FFIX install.
+To run the in-game mod, install Memoria, copy the FF9DepthVR folder into your game folder,
+then run runtime-patch\Install-FF9DepthVR.ps1 against your local FINAL FANTASY IX folder.
 "@ | Set-Content -Path (Join-Path $stage "README_SANITIZED_PACKAGE.txt") -Encoding UTF8
 
-Copy-Directory (Join-Path $root "tools") (Join-Path $stage "tools") @("__pycache__") @("*.pyc")
 Copy-Directory (Join-Path $root "docs") (Join-Path $stage "docs") @() @()
 
 Copy-Directory (Join-Path $root "viewer") (Join-Path $stage "viewer") `
@@ -94,15 +102,19 @@ $allFields = Join-Path $stage "artifacts\all-fields"
 New-Item -ItemType Directory -Force -Path $allFields | Out-Null
 Copy-Item -LiteralPath (Join-Path $root "artifacts\all-fields\manifest.json") -Destination $allFields -Force
 Copy-Directory (Join-Path $root "artifacts\all-fields\depth") (Join-Path $allFields "depth") @() @()
-Copy-Directory (Join-Path $root "artifacts\all-fields\logs") (Join-Path $allFields "logs") @() @("*.tmp")
 
 $modSrc = Join-Path $root "artifacts\memoria-mod\FF9DepthVR"
-$modDst = Join-Path $stage "artifacts\memoria-mod\FF9DepthVR"
-Copy-Directory $modSrc $modDst @() @("source_plate*.png", "field_erp*.png", "*.ply", "*.ksplat", "*.splat")
+$modDst = Join-Path $stage "FF9DepthVR"
+Copy-Directory $modSrc $modDst @("FF9_Data", "logs") @("source_plate*.png", "field_erp*.png", "*.ply", "*.ksplat", "*.splat", "*.log")
+
+$runtimePatchSrc = Join-Path $root "runtime-patch"
+if (Test-Path $runtimePatchSrc) {
+    Copy-Directory $runtimePatchSrc (Join-Path $stage "runtime-patch") @() @("Assembly-CSharp.dll")
+}
 
 $fmvDepthSrc = Join-Path $root "artifacts\fmv-depth"
 $fmvDepthDst = Join-Path $modDst "StreamingAssets\Data\FF9DepthVR\fmv-depth"
-Copy-Directory $fmvDepthSrc $fmvDepthDst @("color_frames", "depth_frames") @("frame_*.png", "*.tmp")
+Copy-Directory $fmvDepthSrc $fmvDepthDst @("color_frames", "depth_frames", "logs") @("frame_*.png", "*.tmp", "*.log")
 Write-MemoriaFileList $modDst
 
 $patchDst = Join-Path $stage "memoria-patch-source"
@@ -117,11 +129,14 @@ $bad = Get-ChildItem -Path $stage -Recurse -File -ErrorAction SilentlyContinue |
         $relative = ([System.IO.Path]::GetFullPath($_.FullName) -replace "^$stageFull", "")
         ($relative -match "viewer\\public\\assets\\(originals|maps)\\") -or
         ($relative -match "artifacts\\all-fields\\(source|debug|erp|erp_|splat|splat_)\\") -or
-        ($relative -match "artifacts\\memoria-mod\\.*fmv-depth\\.*\\(color_frames|depth_frames)\\") -or
-        ($relative -match "artifacts\\memoria-mod\\.*fmv-depth\\.*frame_\d+\.png$") -or
-        ($relative -match "artifacts\\memoria-mod\\.*(source_plate|field_erp).*\.(png|jpg|jpeg|webp)$") -or
+        ($relative -match "FF9DepthVR\\.*fmv-depth\\.*\\(color_frames|depth_frames)\\") -or
+        ($relative -match "FF9DepthVR\\.*fmv-depth\\.*frame_\d+\.png$") -or
+        ($relative -match "(^|\\)logs(\\|$)|\.log$") -or
+        ($relative -match "FF9DepthVR\\.*(source_plate|field_erp).*\.(png|jpg|jpeg|webp)$") -or
         ($relative -match "viewer\\public\\assets\\.*(source_plate|field_erp).*\.(png|jpg|jpeg|webp)$") -or
-        ($relative -match "\.(ply|ksplat|splat)$")
+        ($relative -match "\.(ply|ksplat|splat)$") -or
+        ($relative -match "Assembly-CSharp\.dll$") -or
+        ($relative -match "(^|\\)FF9_Data(\\|$)")
     }
 
 if ($bad.Count -gt 0) {

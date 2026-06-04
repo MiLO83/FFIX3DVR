@@ -1,0 +1,2549 @@
+{
+  "ok": true,
+  "dataSize": 3000,
+  "orgPos": [
+    -405,
+    -3,
+    -1221
+  ],
+  "curPos": [
+    -405,
+    -3,
+    -1221
+  ],
+  "minPos": [
+    -405,
+    -3,
+    -1221
+  ],
+  "maxPos": [
+    1142,
+    11,
+    1591
+  ],
+  "charPos": [
+    412,
+    -3,
+    -91
+  ],
+  "activeFloor": 0,
+  "activeTri": 0,
+  "counts": {
+    "triangles": 46,
+    "edges": 138,
+    "animations": 0,
+    "floors": 3,
+    "normals": 1,
+    "vertices": 42
+  },
+  "offsets": {
+    "triangles": 60,
+    "edges": 1900,
+    "animations": 2452,
+    "floors": 2452,
+    "normals": 2548,
+    "vertices": 2564
+  },
+  "floors": [
+    {
+      "floorFlags": 0,
+      "floorIndex": 0,
+      "orgPos": [
+        256,
+        0,
+        0
+      ],
+      "curPos": [
+        256,
+        0,
+        0
+      ],
+      "minPos": [
+        256,
+        0,
+        0
+      ],
+      "maxPos": [
+        0,
+        -14,
+        -1157
+      ],
+      "triIndices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ]
+    },
+    {
+      "floorFlags": 0,
+      "floorIndex": 1,
+      "orgPos": [
+        177,
+        0,
+        921
+      ],
+      "curPos": [
+        177,
+        0,
+        921
+      ],
+      "minPos": [
+        177,
+        0,
+        921
+      ],
+      "maxPos": [
+        -642,
+        -14,
+        -1014
+      ],
+      "triIndices": [
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    {
+      "floorFlags": 0,
+      "floorIndex": 2,
+      "orgPos": [
+        0,
+        0,
+        1724
+      ],
+      "curPos": [
+        0,
+        0,
+        1724
+      ],
+      "minPos": [
+        0,
+        0,
+        1724
+      ],
+      "maxPos": [
+        -935,
+        0,
+        0
+      ],
+      "triIndices": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ]
+    }
+  ],
+  "vertices": [
+    [
+      649,
+      0,
+      1326
+    ],
+    [
+      644,
+      0,
+      1049
+    ],
+    [
+      392,
+      0,
+      1014
+    ],
+    [
+      848,
+      0,
+      471
+    ],
+    [
+      1118,
+      0,
+      295
+    ],
+    [
+      713,
+      0,
+      248
+    ],
+    [
+      703,
+      0,
+      796
+    ],
+    [
+      377,
+      0,
+      600
+    ],
+    [
+      972,
+      0,
+      1037
+    ],
+    [
+      599,
+      0,
+      528
+    ],
+    [
+      963,
+      0,
+      799
+    ],
+    [
+      1003,
+      0,
+      101
+    ],
+    [
+      393,
+      0,
+      273
+    ],
+    [
+      7,
+      0,
+      921
+    ],
+    [
+      0,
+      0,
+      529
+    ],
+    [
+      195,
+      0,
+      177
+    ],
+    [
+      450,
+      0,
+      42
+    ],
+    [
+      697,
+      0,
+      0
+    ],
+    [
+      549,
+      0,
+      1655
+    ],
+    [
+      706,
+      0,
+      1626
+    ],
+    [
+      918,
+      0,
+      1507
+    ],
+    [
+      1060,
+      0,
+      1290
+    ],
+    [
+      1211,
+      0,
+      1120
+    ],
+    [
+      1291,
+      0,
+      835
+    ],
+    [
+      1162,
+      0,
+      499
+    ],
+    [
+      471,
+      0,
+      93
+    ],
+    [
+      471,
+      0,
+      477
+    ],
+    [
+      728,
+      0,
+      405
+    ],
+    [
+      0,
+      0,
+      803
+    ],
+    [
+      435,
+      0,
+      877
+    ],
+    [
+      122,
+      0,
+      527
+    ],
+    [
+      628,
+      0,
+      734
+    ],
+    [
+      86,
+      0,
+      243
+    ],
+    [
+      86,
+      0,
+      0
+    ],
+    [
+      0,
+      14,
+      725
+    ],
+    [
+      0,
+      14,
+      1088
+    ],
+    [
+      379,
+      14,
+      1088
+    ],
+    [
+      379,
+      14,
+      725
+    ],
+    [
+      76,
+      0,
+      376
+    ],
+    [
+      379,
+      0,
+      376
+    ],
+    [
+      177,
+      0,
+      0
+    ],
+    [
+      612,
+      0,
+      74
+    ]
+  ],
+  "triangles": [
+    {
+      "triIndex": 0,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        0,
+        1,
+        2
+      ],
+      "edgeIndices": [
+        0,
+        1,
+        2
+      ],
+      "neighborIndices": [
+        32,
+        5,
+        2
+      ],
+      "center": [
+        561,
+        0,
+        1130
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          495,
+          -3,
+          -172
+        ],
+        [
+          243,
+          -3,
+          -207
+        ]
+      ]
+    },
+    {
+      "triIndex": 1,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        3,
+        4,
+        5
+      ],
+      "edgeIndices": [
+        3,
+        4,
+        5
+      ],
+      "neighborIndices": [
+        12,
+        31,
+        9
+      ],
+      "center": [
+        893,
+        0,
+        338
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          699,
+          -3,
+          -750
+        ],
+        [
+          969,
+          -3,
+          -926
+        ],
+        [
+          564,
+          -3,
+          -973
+        ]
+      ]
+    },
+    {
+      "triIndex": 2,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        2,
+        1,
+        6
+      ],
+      "edgeIndices": [
+        6,
+        7,
+        8
+      ],
+      "neighborIndices": [
+        3,
+        0,
+        4
+      ],
+      "center": [
+        579,
+        0,
+        953
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          243,
+          -3,
+          -207
+        ],
+        [
+          495,
+          -3,
+          -172
+        ],
+        [
+          554,
+          -3,
+          -425
+        ]
+      ]
+    },
+    {
+      "triIndex": 3,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        6,
+        7,
+        2
+      ],
+      "edgeIndices": [
+        9,
+        10,
+        11
+      ],
+      "neighborIndices": [
+        2,
+        6,
+        13
+      ],
+      "center": [
+        490,
+        0,
+        804
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          228,
+          -3,
+          -621
+        ],
+        [
+          243,
+          -3,
+          -207
+        ]
+      ]
+    },
+    {
+      "triIndex": 4,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        8,
+        6,
+        1
+      ],
+      "edgeIndices": [
+        12,
+        13,
+        14
+      ],
+      "neighborIndices": [
+        5,
+        10,
+        2
+      ],
+      "center": [
+        773,
+        0,
+        961
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          823,
+          -3,
+          -184
+        ],
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          495,
+          -3,
+          -172
+        ]
+      ]
+    },
+    {
+      "triIndex": 5,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        1,
+        0,
+        8
+      ],
+      "edgeIndices": [
+        15,
+        16,
+        17
+      ],
+      "neighborIndices": [
+        4,
+        0,
+        25
+      ],
+      "center": [
+        755,
+        0,
+        1138
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          495,
+          -3,
+          -172
+        ],
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          823,
+          -3,
+          -184
+        ]
+      ]
+    },
+    {
+      "triIndex": 6,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        7,
+        6,
+        9
+      ],
+      "edgeIndices": [
+        18,
+        19,
+        20
+      ],
+      "neighborIndices": [
+        21,
+        3,
+        7
+      ],
+      "center": [
+        559,
+        0,
+        642
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          228,
+          -3,
+          -621
+        ],
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          450,
+          -3,
+          -693
+        ]
+      ]
+    },
+    {
+      "triIndex": 7,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        9,
+        6,
+        3
+      ],
+      "edgeIndices": [
+        21,
+        22,
+        23
+      ],
+      "neighborIndices": [
+        12,
+        6,
+        8
+      ],
+      "center": [
+        716,
+        0,
+        599
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          450,
+          -3,
+          -693
+        ],
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          699,
+          -3,
+          -750
+        ]
+      ]
+    },
+    {
+      "triIndex": 8,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        3,
+        6,
+        10
+      ],
+      "edgeIndices": [
+        24,
+        25,
+        26
+      ],
+      "neighborIndices": [
+        30,
+        7,
+        10
+      ],
+      "center": [
+        838,
+        0,
+        689
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          699,
+          -3,
+          -750
+        ],
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          814,
+          -3,
+          -422
+        ]
+      ]
+    },
+    {
+      "triIndex": 9,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        5,
+        4,
+        11
+      ],
+      "edgeIndices": [
+        27,
+        28,
+        29
+      ],
+      "neighborIndices": [
+        20,
+        1,
+        -1
+      ],
+      "center": [
+        944,
+        0,
+        215
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          564,
+          -3,
+          -973
+        ],
+        [
+          969,
+          -3,
+          -926
+        ],
+        [
+          854,
+          -3,
+          -1120
+        ]
+      ]
+    },
+    {
+      "triIndex": 10,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        10,
+        6,
+        8
+      ],
+      "edgeIndices": [
+        30,
+        31,
+        32
+      ],
+      "neighborIndices": [
+        28,
+        8,
+        4
+      ],
+      "center": [
+        879,
+        0,
+        878
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          814,
+          -3,
+          -422
+        ],
+        [
+          554,
+          -3,
+          -425
+        ],
+        [
+          823,
+          -3,
+          -184
+        ]
+      ]
+    },
+    {
+      "triIndex": 11,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        5,
+        12,
+        9
+      ],
+      "edgeIndices": [
+        33,
+        34,
+        35
+      ],
+      "neighborIndices": [
+        12,
+        18,
+        21
+      ],
+      "center": [
+        568,
+        0,
+        350
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          564,
+          -3,
+          -973
+        ],
+        [
+          244,
+          -3,
+          -948
+        ],
+        [
+          450,
+          -3,
+          -693
+        ]
+      ]
+    },
+    {
+      "triIndex": 12,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        9,
+        3,
+        5
+      ],
+      "edgeIndices": [
+        36,
+        37,
+        38
+      ],
+      "neighborIndices": [
+        11,
+        7,
+        1
+      ],
+      "center": [
+        720,
+        0,
+        416
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          450,
+          -3,
+          -693
+        ],
+        [
+          699,
+          -3,
+          -750
+        ],
+        [
+          564,
+          -3,
+          -973
+        ]
+      ]
+    },
+    {
+      "triIndex": 13,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        13,
+        2,
+        7
+      ],
+      "edgeIndices": [
+        39,
+        40,
+        41
+      ],
+      "neighborIndices": [
+        14,
+        38,
+        3
+      ],
+      "center": [
+        258,
+        0,
+        845
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -142,
+          -3,
+          -300
+        ],
+        [
+          243,
+          -3,
+          -207
+        ],
+        [
+          228,
+          -3,
+          -621
+        ]
+      ]
+    },
+    {
+      "triIndex": 14,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        14,
+        13,
+        7
+      ],
+      "edgeIndices": [
+        42,
+        43,
+        44
+      ],
+      "neighborIndices": [
+        15,
+        -1,
+        13
+      ],
+      "center": [
+        128,
+        0,
+        684
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -149,
+          -3,
+          -692
+        ],
+        [
+          -142,
+          -3,
+          -300
+        ],
+        [
+          228,
+          -3,
+          -621
+        ]
+      ]
+    },
+    {
+      "triIndex": 15,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        12,
+        14,
+        7
+      ],
+      "edgeIndices": [
+        45,
+        46,
+        47
+      ],
+      "neighborIndices": [
+        21,
+        16,
+        14
+      ],
+      "center": [
+        256,
+        0,
+        468
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          244,
+          -3,
+          -948
+        ],
+        [
+          -149,
+          -3,
+          -692
+        ],
+        [
+          228,
+          -3,
+          -621
+        ]
+      ]
+    },
+    {
+      "triIndex": 16,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        15,
+        14,
+        12
+      ],
+      "edgeIndices": [
+        48,
+        49,
+        50
+      ],
+      "neighborIndices": [
+        17,
+        -1,
+        15
+      ],
+      "center": [
+        196,
+        0,
+        327
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          46,
+          -3,
+          -1044
+        ],
+        [
+          -149,
+          -3,
+          -692
+        ],
+        [
+          244,
+          -3,
+          -948
+        ]
+      ]
+    },
+    {
+      "triIndex": 17,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        16,
+        15,
+        12
+      ],
+      "edgeIndices": [
+        51,
+        52,
+        53
+      ],
+      "neighborIndices": [
+        18,
+        -1,
+        16
+      ],
+      "center": [
+        346,
+        0,
+        164
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          301,
+          -3,
+          -1179
+        ],
+        [
+          46,
+          -3,
+          -1044
+        ],
+        [
+          244,
+          -3,
+          -948
+        ]
+      ]
+    },
+    {
+      "triIndex": 18,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        16,
+        12,
+        5
+      ],
+      "edgeIndices": [
+        54,
+        55,
+        56
+      ],
+      "neighborIndices": [
+        19,
+        17,
+        11
+      ],
+      "center": [
+        518,
+        0,
+        188
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          301,
+          -3,
+          -1179
+        ],
+        [
+          244,
+          -3,
+          -948
+        ],
+        [
+          564,
+          -3,
+          -973
+        ]
+      ]
+    },
+    {
+      "triIndex": 19,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        17,
+        16,
+        5
+      ],
+      "edgeIndices": [
+        57,
+        58,
+        59
+      ],
+      "neighborIndices": [
+        20,
+        -1,
+        18
+      ],
+      "center": [
+        620,
+        0,
+        97
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          548,
+          -3,
+          -1221
+        ],
+        [
+          301,
+          -3,
+          -1179
+        ],
+        [
+          564,
+          -3,
+          -973
+        ]
+      ]
+    },
+    {
+      "triIndex": 20,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        11,
+        17,
+        5
+      ],
+      "edgeIndices": [
+        60,
+        61,
+        62
+      ],
+      "neighborIndices": [
+        9,
+        -1,
+        19
+      ],
+      "center": [
+        804,
+        0,
+        117
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          854,
+          -3,
+          -1120
+        ],
+        [
+          548,
+          -3,
+          -1221
+        ],
+        [
+          564,
+          -3,
+          -973
+        ]
+      ]
+    },
+    {
+      "triIndex": 21,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        9,
+        12,
+        7
+      ],
+      "edgeIndices": [
+        63,
+        64,
+        65
+      ],
+      "neighborIndices": [
+        6,
+        11,
+        15
+      ],
+      "center": [
+        456,
+        0,
+        467
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          450,
+          -3,
+          -693
+        ],
+        [
+          244,
+          -3,
+          -948
+        ],
+        [
+          228,
+          -3,
+          -621
+        ]
+      ]
+    },
+    {
+      "triIndex": 22,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        0,
+        18,
+        19
+      ],
+      "edgeIndices": [
+        66,
+        67,
+        68
+      ],
+      "neighborIndices": [
+        23,
+        39,
+        -1
+      ],
+      "center": [
+        634,
+        0,
+        1535
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          400,
+          -3,
+          434
+        ],
+        [
+          557,
+          -3,
+          405
+        ]
+      ]
+    },
+    {
+      "triIndex": 23,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        0,
+        19,
+        20
+      ],
+      "edgeIndices": [
+        69,
+        70,
+        71
+      ],
+      "neighborIndices": [
+        24,
+        22,
+        -1
+      ],
+      "center": [
+        757,
+        0,
+        1486
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          557,
+          -3,
+          405
+        ],
+        [
+          769,
+          -3,
+          286
+        ]
+      ]
+    },
+    {
+      "triIndex": 24,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        0,
+        20,
+        21
+      ],
+      "edgeIndices": [
+        72,
+        73,
+        74
+      ],
+      "neighborIndices": [
+        25,
+        23,
+        -1
+      ],
+      "center": [
+        875,
+        0,
+        1374
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          769,
+          -3,
+          286
+        ],
+        [
+          911,
+          -3,
+          69
+        ]
+      ]
+    },
+    {
+      "triIndex": 25,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        8,
+        0,
+        21
+      ],
+      "edgeIndices": [
+        75,
+        76,
+        77
+      ],
+      "neighborIndices": [
+        26,
+        5,
+        24
+      ],
+      "center": [
+        893,
+        0,
+        1218
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          823,
+          -3,
+          -184
+        ],
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          911,
+          -3,
+          69
+        ]
+      ]
+    },
+    {
+      "triIndex": 26,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        8,
+        21,
+        22
+      ],
+      "edgeIndices": [
+        78,
+        79,
+        80
+      ],
+      "neighborIndices": [
+        27,
+        25,
+        -1
+      ],
+      "center": [
+        1081,
+        0,
+        1149
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          823,
+          -3,
+          -184
+        ],
+        [
+          911,
+          -3,
+          69
+        ],
+        [
+          1062,
+          -3,
+          -101
+        ]
+      ]
+    },
+    {
+      "triIndex": 27,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        8,
+        22,
+        23
+      ],
+      "edgeIndices": [
+        81,
+        82,
+        83
+      ],
+      "neighborIndices": [
+        28,
+        26,
+        -1
+      ],
+      "center": [
+        1158,
+        0,
+        998
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          823,
+          -3,
+          -184
+        ],
+        [
+          1062,
+          -3,
+          -101
+        ],
+        [
+          1142,
+          -3,
+          -386
+        ]
+      ]
+    },
+    {
+      "triIndex": 28,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        10,
+        8,
+        23
+      ],
+      "edgeIndices": [
+        84,
+        85,
+        86
+      ],
+      "neighborIndices": [
+        29,
+        10,
+        27
+      ],
+      "center": [
+        1075,
+        0,
+        891
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          814,
+          -3,
+          -422
+        ],
+        [
+          823,
+          -3,
+          -184
+        ],
+        [
+          1142,
+          -3,
+          -386
+        ]
+      ]
+    },
+    {
+      "triIndex": 29,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        10,
+        23,
+        24
+      ],
+      "edgeIndices": [
+        87,
+        88,
+        89
+      ],
+      "neighborIndices": [
+        30,
+        28,
+        -1
+      ],
+      "center": [
+        1138,
+        0,
+        711
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          814,
+          -3,
+          -422
+        ],
+        [
+          1142,
+          -3,
+          -386
+        ],
+        [
+          1013,
+          -3,
+          -722
+        ]
+      ]
+    },
+    {
+      "triIndex": 30,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        3,
+        10,
+        24
+      ],
+      "edgeIndices": [
+        90,
+        91,
+        92
+      ],
+      "neighborIndices": [
+        31,
+        8,
+        29
+      ],
+      "center": [
+        991,
+        0,
+        590
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          699,
+          -3,
+          -750
+        ],
+        [
+          814,
+          -3,
+          -422
+        ],
+        [
+          1013,
+          -3,
+          -722
+        ]
+      ]
+    },
+    {
+      "triIndex": 31,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 0,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        3,
+        24,
+        4
+      ],
+      "edgeIndices": [
+        93,
+        94,
+        95
+      ],
+      "neighborIndices": [
+        1,
+        30,
+        -1
+      ],
+      "center": [
+        1042,
+        0,
+        422
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          699,
+          -3,
+          -750
+        ],
+        [
+          1013,
+          -3,
+          -722
+        ],
+        [
+          969,
+          -3,
+          -926
+        ]
+      ]
+    },
+    {
+      "triIndex": 32,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        25,
+        26,
+        27
+      ],
+      "edgeIndices": [
+        96,
+        97,
+        98
+      ],
+      "neighborIndices": [
+        0,
+        37,
+        39
+      ],
+      "center": [
+        556,
+        0,
+        325
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          243,
+          -3,
+          -207
+        ],
+        [
+          243,
+          -3,
+          177
+        ],
+        [
+          500,
+          -3,
+          105
+        ]
+      ]
+    },
+    {
+      "triIndex": 33,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        28,
+        29,
+        30
+      ],
+      "edgeIndices": [
+        99,
+        100,
+        101
+      ],
+      "neighborIndices": [
+        -1,
+        45,
+        34
+      ],
+      "center": [
+        186,
+        0,
+        735
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -228,
+          -3,
+          503
+        ],
+        [
+          207,
+          -3,
+          577
+        ],
+        [
+          -106,
+          -3,
+          227
+        ]
+      ]
+    },
+    {
+      "triIndex": 34,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        30,
+        29,
+        26
+      ],
+      "edgeIndices": [
+        102,
+        103,
+        104
+      ],
+      "neighborIndices": [
+        36,
+        33,
+        35
+      ],
+      "center": [
+        342,
+        0,
+        627
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -106,
+          -3,
+          227
+        ],
+        [
+          207,
+          -3,
+          577
+        ],
+        [
+          243,
+          -3,
+          177
+        ]
+      ]
+    },
+    {
+      "triIndex": 35,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        26,
+        29,
+        31
+      ],
+      "edgeIndices": [
+        105,
+        106,
+        107
+      ],
+      "neighborIndices": [
+        39,
+        34,
+        -1
+      ],
+      "center": [
+        511,
+        0,
+        696
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          243,
+          -3,
+          177
+        ],
+        [
+          207,
+          -3,
+          577
+        ],
+        [
+          400,
+          -3,
+          434
+        ]
+      ]
+    },
+    {
+      "triIndex": 36,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        30,
+        26,
+        32
+      ],
+      "edgeIndices": [
+        108,
+        109,
+        110
+      ],
+      "neighborIndices": [
+        -1,
+        34,
+        37
+      ],
+      "center": [
+        227,
+        0,
+        415
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -106,
+          -3,
+          227
+        ],
+        [
+          243,
+          -3,
+          177
+        ],
+        [
+          -142,
+          -3,
+          -57
+        ]
+      ]
+    },
+    {
+      "triIndex": 37,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        32,
+        26,
+        25
+      ],
+      "edgeIndices": [
+        111,
+        112,
+        113
+      ],
+      "neighborIndices": [
+        38,
+        36,
+        32
+      ],
+      "center": [
+        342,
+        0,
+        271
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -142,
+          -3,
+          -57
+        ],
+        [
+          243,
+          -3,
+          177
+        ],
+        [
+          243,
+          -3,
+          -207
+        ]
+      ]
+    },
+    {
+      "triIndex": 38,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        33,
+        32,
+        25
+      ],
+      "edgeIndices": [
+        114,
+        115,
+        116
+      ],
+      "neighborIndices": [
+        13,
+        -1,
+        37
+      ],
+      "center": [
+        215,
+        0,
+        112
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -142,
+          -3,
+          -300
+        ],
+        [
+          -142,
+          -3,
+          -57
+        ],
+        [
+          243,
+          -3,
+          -207
+        ]
+      ]
+    },
+    {
+      "triIndex": 39,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 1,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        27,
+        26,
+        31
+      ],
+      "edgeIndices": [
+        117,
+        118,
+        119
+      ],
+      "neighborIndices": [
+        22,
+        32,
+        35
+      ],
+      "center": [
+        609,
+        0,
+        538
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          500,
+          -3,
+          105
+        ],
+        [
+          243,
+          -3,
+          177
+        ],
+        [
+          400,
+          -3,
+          434
+        ]
+      ]
+    },
+    {
+      "triIndex": 40,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        34,
+        35,
+        36
+      ],
+      "edgeIndices": [
+        120,
+        121,
+        122
+      ],
+      "neighborIndices": [
+        41,
+        -1,
+        -1
+      ],
+      "center": [
+        127,
+        14,
+        967
+      ],
+      "d": 720896,
+      "worldVertices": [
+        [
+          -405,
+          11,
+          1228
+        ],
+        [
+          -405,
+          11,
+          1591
+        ],
+        [
+          -26,
+          11,
+          1591
+        ]
+      ]
+    },
+    {
+      "triIndex": 41,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        34,
+        36,
+        37
+      ],
+      "edgeIndices": [
+        123,
+        124,
+        125
+      ],
+      "neighborIndices": [
+        42,
+        40,
+        -1
+      ],
+      "center": [
+        253,
+        14,
+        846
+      ],
+      "d": 720896,
+      "worldVertices": [
+        [
+          -405,
+          11,
+          1228
+        ],
+        [
+          -26,
+          11,
+          1591
+        ],
+        [
+          -26,
+          11,
+          1228
+        ]
+      ]
+    },
+    {
+      "triIndex": 42,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": 0,
+      "thetaX": 0,
+      "thetaZ": 22,
+      "vertexIndices": [
+        34,
+        37,
+        38
+      ],
+      "edgeIndices": [
+        126,
+        127,
+        128
+      ],
+      "neighborIndices": [
+        -1,
+        41,
+        43
+      ],
+      "center": [
+        152,
+        9,
+        608
+      ],
+      "d": -2505441,
+      "worldVertices": [
+        [
+          -405,
+          11,
+          1228
+        ],
+        [
+          -26,
+          11,
+          1228
+        ],
+        [
+          -329,
+          -3,
+          879
+        ]
+      ]
+    },
+    {
+      "triIndex": 43,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": 0,
+      "thetaX": 0,
+      "thetaZ": 22,
+      "vertexIndices": [
+        38,
+        37,
+        39
+      ],
+      "edgeIndices": [
+        129,
+        130,
+        131
+      ],
+      "neighborIndices": [
+        44,
+        42,
+        -1
+      ],
+      "center": [
+        278,
+        4,
+        492
+      ],
+      "d": -2505441,
+      "worldVertices": [
+        [
+          -329,
+          -3,
+          879
+        ],
+        [
+          -26,
+          11,
+          1228
+        ],
+        [
+          -26,
+          -3,
+          879
+        ]
+      ]
+    },
+    {
+      "triIndex": 44,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        40,
+        38,
+        39
+      ],
+      "edgeIndices": [
+        132,
+        133,
+        134
+      ],
+      "neighborIndices": [
+        45,
+        -1,
+        43
+      ],
+      "center": [
+        211,
+        0,
+        250
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -228,
+          -3,
+          503
+        ],
+        [
+          -329,
+          -3,
+          879
+        ],
+        [
+          -26,
+          -3,
+          879
+        ]
+      ]
+    },
+    {
+      "triIndex": 45,
+      "triFlags": 8193,
+      "triData": 0,
+      "floorIndex": 2,
+      "normalIndex": -1,
+      "thetaX": 0,
+      "thetaZ": 0,
+      "vertexIndices": [
+        40,
+        39,
+        41
+      ],
+      "edgeIndices": [
+        135,
+        136,
+        137
+      ],
+      "neighborIndices": [
+        33,
+        44,
+        -1
+      ],
+      "center": [
+        390,
+        0,
+        150
+      ],
+      "d": -196608,
+      "worldVertices": [
+        [
+          -228,
+          -3,
+          503
+        ],
+        [
+          -26,
+          -3,
+          879
+        ],
+        [
+          207,
+          -3,
+          577
+        ]
+      ]
+    }
+  ]
+}

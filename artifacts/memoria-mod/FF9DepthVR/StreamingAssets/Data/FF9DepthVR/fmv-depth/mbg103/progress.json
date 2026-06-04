@@ -1,0 +1,11 @@
+{
+  "status": "complete",
+  "updatedAt": "2026-06-01T20:14:49.110186+00:00",
+  "movieKey": "mbg103",
+  "frames": 210,
+  "done": 210,
+  "failed": 0,
+  "skipped": 171,
+  "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg103\\spec.json",
+  "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg103\\mbg103_depth.bytes"
+}

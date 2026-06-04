@@ -1,0 +1,45 @@
+{
+  "cameraCount": 1,
+  "cameras": [
+    {
+      "index": 0,
+      "proj": 312,
+      "r": [
+        [
+          3996,
+          -138,
+          887
+        ],
+        [
+          646,
+          2847,
+          -2468
+        ],
+        [
+          -571,
+          2730,
+          3000
+        ]
+      ],
+      "t": [
+        -43,
+        -113,
+        1888
+      ],
+      "center_offset": [
+        0,
+        0
+      ],
+      "w": 336,
+      "h": 304,
+      "vrp_min_x": 160,
+      "vrp_max_x": 176,
+      "vrp_min_y": 112,
+      "vrp_max_y": 192,
+      "depth_offset": 1783
+    }
+  ],
+  "activeOverlayCameras": [
+    0
+  ]
+}

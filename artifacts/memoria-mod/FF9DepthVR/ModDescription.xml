@@ -1,10 +1,10 @@
 <Mod>
     <Name>FF9 Depth VR</Name>
-    <Version>0.2.0-open-beta</Version>
+    <Version>0.2.0-open-beta.5</Version>
     <Author>rxcam + Codex</Author>
     <InstallationPath>FF9DepthVR</InstallationPath>
     <Category>Graphics</Category>
     <Description>Open beta prototype for Final Fantasy IX SBS 3D: depth-reconstructed field backgrounds, SBS field/battle/movie camera support, duplicated GUI cameras, and experimental actor ground locking. Vanilla fields remain the fallback if an asset is missing.</Description>
-    <ReleaseDate>2026-05-29</ReleaseDate>
+    <ReleaseDate>2026-06-03</ReleaseDate>
     <FullSize>697043045</FullSize>
 </Mod>

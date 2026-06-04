@@ -41,8 +41,10 @@ namespace Memoria.FF9DepthVR
         private static Int32 _lastSbsToggleFrame = -1;
         private static Int32 _lastActorLookToggleFrame = -1;
         private static Int32 _lastVrCaptureToggleFrame = -1;
-        private static Int32 _lastForegroundMaskWarpToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
+        private static Vector3 _lastInputLookMousePosition;
+        private static Boolean _hasLastInputLookMousePosition;
+        private static Boolean _controllerInputLookMode;
         private static Boolean _movieDebugOverlayEnabled;
         private static FF9DepthVRMovieBgPlate _activeMoviePlate;
         private static global::FieldMap _activeMovieFieldMap;
@@ -51,8 +53,8 @@ namespace Memoria.FF9DepthVR
         public static DepthViewMode ViewMode = DepthViewMode.Depth;
         public static Boolean SbsEnabled = false;
         public static Boolean VrCaptureEnabled = false;
-        public static Boolean ActorLookEnabled = false;
-        internal static Boolean ForegroundMaskDepthWarpEnabled = true;
+        public static Boolean ActorLookEnabled = true;
+        internal static Boolean ForegroundMaskDepthWarpEnabled => true;
         public static Boolean WasSbsToggleInputHandledThisFrame => _lastSbsToggleFrame == Time.frameCount;
         internal static Boolean SbsActive => VrCaptureEnabled || ViewMode != DepthViewMode.Depth;
         internal static Boolean CompareEnabled => !VrCaptureEnabled && ViewMode == DepthViewMode.Compare;
@@ -63,9 +65,8 @@ namespace Memoria.FF9DepthVR
             get
             {
                 String view = VrCaptureEnabled ? "VR" : ViewMode.ToString();
-                String mask = ForegroundMaskDepthWarpEnabled ? "Depth masks" : "Flat masks";
                 String look = ActorLookEnabled ? "Actor+input look" : "Input look";
-                return "FF9DepthVR | View: " + view + " | " + mask + " (F6) | " + look + " (F8)" + (IsMbgPlaybackActive() ? " | MBG" : String.Empty);
+                return "FF9DepthVR | View: " + view + " | Depth masks | " + look + " (F8)" + (IsMbgPlaybackActive() ? " | MBG" : String.Empty);
             }
         }
         internal static Boolean IsMbgPlaybackActive()
@@ -94,32 +95,22 @@ namespace Memoria.FF9DepthVR
         internal static Single DefaultParallaxStrength => _defaults.ParallaxStrength;
         internal static Single DefaultIdleParallaxStrength => _defaults.IdleParallaxStrength;
         internal static Single MoviePlateDistance => 2f;
-        internal static Single MovieStandaloneDepthScale => 0.12f;
+        internal static Single MovieStandaloneDepthScale => 0.06f;
         private static readonly Boolean EnableFieldMovieDepthPlate = false;
+        private const Single ControllerLookDeadzone = 0.18f;
+        private const Single ControllerLookMouseWakePixels = 2f;
 
         public static Boolean TryHandleSbsToggleInput()
         {
             Boolean actorLookHandled = TryHandleActorLookToggleInput();
             Boolean vrCaptureHandled = TryHandleVrCaptureToggleInput();
-            Boolean maskWarpHandled = TryHandleForegroundMaskWarpToggleInput();
             if (!Input.GetKeyDown(KeyCode.F9) || _lastSbsToggleFrame == Time.frameCount)
-                return actorLookHandled || vrCaptureHandled || maskWarpHandled;
+                return actorLookHandled || vrCaptureHandled;
 
             _lastSbsToggleFrame = Time.frameCount;
             ViewMode = ViewMode == DepthViewMode.Depth ? DepthViewMode.Stereo3D : ViewMode == DepthViewMode.Stereo3D ? DepthViewMode.Compare : DepthViewMode.Depth;
             ApplySbsState();
             Log.Message("[FF9DepthVR] View mode = " + ViewMode + " (F9)");
-            return true;
-        }
-
-        public static Boolean TryHandleForegroundMaskWarpToggleInput()
-        {
-            if (!Input.GetKeyDown(KeyCode.F6) || _lastForegroundMaskWarpToggleFrame == Time.frameCount)
-                return false;
-
-            _lastForegroundMaskWarpToggleFrame = Time.frameCount;
-            ForegroundMaskDepthWarpEnabled = !ForegroundMaskDepthWarpEnabled;
-            Log.Message("[FF9DepthVR] Foreground mask depth warp enabled = " + ForegroundMaskDepthWarpEnabled + " (F6)");
             return true;
         }
 
@@ -144,6 +135,90 @@ namespace Memoria.FF9DepthVR
         {
             look = Vector2.zero;
             return VrCaptureEnabled && FF9DepthVRHeadTrackingBridge.TryReadLook(out look);
+        }
+
+        internal static Vector2 InputLookNormalized(Boolean includeMouse)
+        {
+            if (Screen.width <= 0 || Screen.height <= 0)
+                return ApplyHeadTrackLook(Vector2.zero);
+
+            Vector3 mousePosition = Input.mousePosition;
+            Vector2 mouseLook = includeMouse
+                ? new Vector2(
+                    Mathf.Clamp((mousePosition.x / Screen.width - 0.5f) * 2f, -1f, 1f),
+                    Mathf.Clamp((mousePosition.y / Screen.height - 0.5f) * 2f, -1f, 1f)
+                )
+                : Vector2.zero;
+
+            Vector2 controllerLook;
+            if (TryReadControllerLook(out controllerLook))
+            {
+                _controllerInputLookMode = true;
+                _lastInputLookMousePosition = mousePosition;
+                _hasLastInputLookMousePosition = true;
+                return ApplyHeadTrackLook(controllerLook);
+            }
+
+            if (_controllerInputLookMode)
+            {
+                if (!_hasLastInputLookMousePosition)
+                {
+                    _lastInputLookMousePosition = mousePosition;
+                    _hasLastInputLookMousePosition = true;
+                }
+
+                if ((mousePosition - _lastInputLookMousePosition).sqrMagnitude > ControllerLookMouseWakePixels * ControllerLookMouseWakePixels)
+                {
+                    _controllerInputLookMode = false;
+                    _lastInputLookMousePosition = mousePosition;
+                    return ApplyHeadTrackLook(mouseLook);
+                }
+
+                return ApplyHeadTrackLook(Vector2.zero);
+            }
+
+            _lastInputLookMousePosition = mousePosition;
+            _hasLastInputLookMousePosition = true;
+            return ApplyHeadTrackLook(mouseLook);
+        }
+
+        internal static Vector2 ApplyHeadTrackLook(Vector2 manualLook)
+        {
+            Vector2 headLook;
+            if (!TryReadHeadTrackLook(out headLook))
+                return manualLook;
+
+            return new Vector2(
+                Mathf.Clamp(manualLook.x + headLook.x, -1f, 1f),
+                Mathf.Clamp(manualLook.y + headLook.y, -1f, 1f)
+            );
+        }
+
+        private static Boolean TryReadControllerLook(out Vector2 look)
+        {
+            look = Vector2.zero;
+            try
+            {
+                if (!HonoInputManager.ApplicationIsActivated())
+                    return false;
+
+                var state = UnityXInput.XInputManager.Instance.CurrentState;
+                if (!state.IsConnected)
+                    return false;
+
+                Vector2 raw = new Vector2(state.ThumbSticks.Right.X, state.ThumbSticks.Right.Y);
+                Single magnitude = raw.magnitude;
+                if (magnitude <= ControllerLookDeadzone)
+                    return false;
+
+                Single scaledMagnitude = Mathf.InverseLerp(ControllerLookDeadzone, 1f, Mathf.Clamp01(magnitude));
+                look = raw.normalized * scaledMagnitude;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static Boolean TryHandleActorLookToggleInput()
@@ -1705,15 +1780,10 @@ namespace Memoria.FF9DepthVR
         private Single _rackTargetDepth = 0.5f;
         private Single _rackElapsedSeconds;
         private Int32 _lastUpdatedFrame = -1;
-        private Vector3 _lastMousePosition;
-        private Boolean _hasLastMousePosition;
-        private Boolean _controllerLookMode;
         private Vector2 _lookFocusUv = new Vector2(0.5f, 0.5f);
         private Vector2 _actorLookUv = new Vector2(0.5f, 0.5f);
         private Boolean _hasActorLookTarget;
         private Boolean _centeredPlateCoordinates;
-        private const Single ControllerLookDeadzone = 0.18f;
-        private const Single ControllerLookMouseWakePixels = 2f;
         private static readonly Boolean EnableCpuDofFallback = false;
 
         public void Initialize(Mesh mesh, Vector3[] baseVertices, Color[] depthColors, Single width, Single height, Single strength, Single idleStrength, Material material, Texture2D colorTexture, Texture2D depthTexture)
@@ -1970,63 +2040,15 @@ namespace Memoria.FF9DepthVR
 
         private Vector2 CameraLookNormalized()
         {
-            Vector3 mousePosition = Input.mousePosition;
-            Vector2 mouseLook = new Vector2(
-                Mathf.Clamp((mousePosition.x / Screen.width - 0.5f) * 2f, -1f, 1f),
-                Mathf.Clamp((mousePosition.y / Screen.height - 0.5f) * 2f, -1f, 1f)
-            );
-
-            Vector2 controllerLook;
-            if (TryReadControllerLook(out controllerLook))
-            {
-                _controllerLookMode = true;
-                _lastMousePosition = mousePosition;
-                _hasLastMousePosition = true;
-                return AddActorLookBaseline(controllerLook);
-            }
-
-            if (_controllerLookMode)
-            {
-                if (!_hasLastMousePosition)
-                {
-                    _lastMousePosition = mousePosition;
-                    _hasLastMousePosition = true;
-                }
-
-                if ((mousePosition - _lastMousePosition).sqrMagnitude > ControllerLookMouseWakePixels * ControllerLookMouseWakePixels)
-                {
-                    _controllerLookMode = false;
-                    _lastMousePosition = mousePosition;
-                    return AddActorLookBaseline(mouseLook);
-                }
-
-                return AddActorLookBaseline(Vector2.zero);
-            }
-
-            _lastMousePosition = mousePosition;
-            _hasLastMousePosition = true;
-            return AddActorLookBaseline(mouseLook);
+            return AddActorLookBaseline(FF9DepthVRFieldRenderer.InputLookNormalized(true));
         }
 
         private Vector2 AddActorLookBaseline(Vector2 manualLook)
         {
-            manualLook = AddHeadTrackLook(manualLook);
             Vector2 actorLook = ActorLookBaselineNormalized();
             return new Vector2(
                 Mathf.Clamp(manualLook.x + actorLook.x, -1f, 1f),
                 Mathf.Clamp(manualLook.y + actorLook.y, -1f, 1f)
-            );
-        }
-
-        private Vector2 AddHeadTrackLook(Vector2 manualLook)
-        {
-            Vector2 headLook;
-            if (!FF9DepthVRFieldRenderer.TryReadHeadTrackLook(out headLook))
-                return manualLook;
-
-            return new Vector2(
-                Mathf.Clamp(manualLook.x + headLook.x, -1f, 1f),
-                Mathf.Clamp(manualLook.y + headLook.y, -1f, 1f)
             );
         }
 
@@ -2039,33 +2061,6 @@ namespace Memoria.FF9DepthVR
                 Mathf.Clamp((_actorLookUv.x - 0.5f) * 2f, -1f, 1f),
                 Mathf.Clamp((_actorLookUv.y - 0.5f) * 2f, -1f, 1f)
             );
-        }
-
-        private static Boolean TryReadControllerLook(out Vector2 look)
-        {
-            look = Vector2.zero;
-            try
-            {
-                if (!HonoInputManager.ApplicationIsActivated())
-                    return false;
-
-                var state = UnityXInput.XInputManager.Instance.CurrentState;
-                if (!state.IsConnected)
-                    return false;
-
-                Vector2 raw = new Vector2(state.ThumbSticks.Right.X, state.ThumbSticks.Right.Y);
-                Single magnitude = raw.magnitude;
-                if (magnitude <= ControllerLookDeadzone)
-                    return false;
-
-                Single scaledMagnitude = Mathf.InverseLerp(ControllerLookDeadzone, 1f, Mathf.Clamp01(magnitude));
-                look = raw.normalized * scaledMagnitude;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private Single SampleDepth(Vector2 focusUv)
@@ -3533,9 +3528,16 @@ namespace Memoria.FF9DepthVR
             _baseRotation = _mainCamera.transform.rotation;
             _baseScale = _mainCamera.transform.localScale;
 
+            Vector2 look = FF9DepthVRFieldRenderer.InputLookNormalized(true);
+            Quaternion lookRotation = Quaternion.Euler(-look.y * FF9DepthVRFieldRenderer.ViewAngleMultiplier, look.x * FF9DepthVRFieldRenderer.ViewAngleMultiplier * FF9DepthVRFieldRenderer.ViewAngleXMultiplier, 0f);
+            Quaternion battleRotation = _baseRotation * lookRotation;
+            Vector3 baseForward = _baseRotation * Vector3.forward;
+            Vector3 forward = battleRotation * Vector3.forward;
             Vector3 target = FindBattleConvergenceTarget();
-            Vector3 right = _baseRotation * Vector3.right;
-            Vector3 up = _baseRotation * Vector3.up;
+            Single targetDistance = Mathf.Max(200f, Vector3.Dot(target - _basePosition, baseForward));
+            target += (forward - baseForward) * targetDistance;
+            Vector3 right = battleRotation * Vector3.right;
+            Vector3 up = battleRotation * Vector3.up;
             Vector3 leftEye = _basePosition - right * (EyeSeparation * 0.5f);
             Vector3 rightEye = _basePosition + right * (EyeSeparation * 0.5f);
 

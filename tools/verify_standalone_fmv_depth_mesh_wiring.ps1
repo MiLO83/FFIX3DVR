@@ -18,6 +18,12 @@ function Assert-Contains([string]$needle, [string]$message) {
     }
 }
 
+function Assert-Matches([string]$pattern, [string]$message) {
+    if ($text -notmatch $pattern) {
+        throw $message
+    }
+}
+
 Assert-Contains "_hasDepthSurfaceFrame" "Standalone FMVs need an explicit depth-surface state."
 Assert-Contains "SetCenteredPlateCoordinates" "Standalone camera-space FMV meshes need centered plate coordinate handling."
 Assert-Contains "ApplyStandaloneDepthSurfaceState" "Standalone FMVs need a depth-mesh/native-plane state switch."
@@ -29,5 +35,6 @@ Assert-Contains "MovieCameraNearZ" "Standalone FMV depth meshes must guard again
 Assert-Contains "Mathf.Clamp(cameraFrame.CenterZ + z" "Standalone FMV depth displacement must stay inside the camera clip range."
 Assert-Contains "_meshRenderer.enabled = true;" "Depth-available FMVs must enable the mesh renderer in SBS."
 Assert-Contains "HideNativeMoviePlane();" "Depth-available FMVs must hide the native flat plane."
+Assert-Matches "MovieStandaloneDepthScale\s*=>\s*0\.0?6f\s*;" "Standalone FMV depth scale should stay softened at 0.06f for the alpha."
 
 Write-Host "Standalone FMV depth mesh wiring markers present in $SourcePath"

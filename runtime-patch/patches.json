@@ -1,0 +1,39 @@
+{
+  "format": "FF9DepthVRRuntimePatchV1",
+  "version": "0.2.0-open-beta.5",
+  "dllRelativePath": "x64/FF9_Data/Managed/Assembly-CSharp.dll",
+  "target": {
+    "sha256": "15677CA06026C3BEE6B95F63FAC9F90BAE5A49CEA3807887EF2F597270F92D6B",
+    "length": 5600768
+  },
+  "patches": [
+    {
+      "label": "Memoria reference Assembly-CSharp",
+      "baseSha256": "2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E",
+      "baseLength": 6028288,
+      "ipsFile": "Assembly-CSharp.memoria-reference-to-ff9depthvr.ips",
+      "ipsSha256": "C258119E6A1E9B4AE702B48D8EC0FD37895A41D869236E2E7CBC611B690EBEE7",
+      "ipsLength": 5600479,
+      "targetSha256": "15677CA06026C3BEE6B95F63FAC9F90BAE5A49CEA3807887EF2F597270F92D6B",
+      "targetLength": 5600768,
+      "gapJoinBytes": 8,
+      "records": 131,
+      "encodedDataBytes": 5599816,
+      "createdUtc": "2026-06-04T02:17:50.887Z"
+    },
+    {
+      "label": "Previous FF9DepthVR alpha runtime",
+      "baseSha256": "B5279702A701A5E8AC288B65C3456B41CC030C4F24DF5513D9572734111F02A6",
+      "baseLength": 5600768,
+      "ipsFile": "Assembly-CSharp.previous-alpha-to-open-beta-5.ips",
+      "ipsSha256": "0D9F56ADD74E23404AE1963CB6DE2FC5AB6CC777CDA3E2798D0B5075C6FD9270",
+      "ipsLength": 3165654,
+      "targetSha256": "15677CA06026C3BEE6B95F63FAC9F90BAE5A49CEA3807887EF2F597270F92D6B",
+      "targetLength": 5600768,
+      "gapJoinBytes": 8,
+      "records": 31198,
+      "encodedDataBytes": 3009656,
+      "createdUtc": "2026-06-04T02:17:59.232Z"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "width": 1280,
+  "height": 960,
+  "fps": "15/1",
+  "timeBase": "1/15",
+  "duration": 44.8,
+  "expectedFrames": 672,
+  "schema": 1,
+  "generatedAt": "2026-05-30T18:42:06.672691+00:00",
+  "movieKey": "FMV012",
+  "sourceMovie": "F:\\SteamLibrary\\steamapps\\common\\FINAL FANTASY IX\\StreamingAssets\\ma\\FMV012.bytes",
+  "colorReference": "color_frames/frame_%06d.png",
+  "depthFrames": "depth_frames/frame_%06d.png",
+  "depthVideo": "FMV012_depth.bytes",
+  "depthSource": "per-frame color reference via DepthAnythingV2Preprocessor",
+  "rendering": {
+    "mode": "walkmeshDepth",
+    "walkmeshMode": "depth",
+    "depthSurfaceMode": "farthest",
+    "projectionYMode": "flipped",
+    "frameSync": "movieMaterial.Frame",
+    "colorReference": "decoded source movie frame with matching frame index",
+    "depthReference": "depth frame generated from the matching color frame",
+    "notes": "Equivalent to depth-gallery.html with Walkmesh Depth enabled; runtime projection must cast actors, masks, and any walkmesh-aware overlays against the depth-deformed movie surface, not the flat movie quad."
+  },
+  "ckpt": "depth_anything_v2_vitl.pth",
+  "resolution": 1024,
+  "frameLimit": 0
+}

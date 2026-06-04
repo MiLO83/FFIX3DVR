@@ -1,0 +1,181 @@
+{
+  "updatedAt": "2026-06-02T04:23:22.260962+00:00",
+  "movies": [
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T20:14:49.110186+00:00",
+      "movieKey": "mbg103",
+      "frames": 210,
+      "done": 210,
+      "failed": 0,
+      "skipped": 171,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg103\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg103\\mbg103_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T20:42:59.982179+00:00",
+      "movieKey": "mbg105",
+      "frames": 229,
+      "done": 229,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg105\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg105\\mbg105_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T21:15:51.446221+00:00",
+      "movieKey": "mbg106",
+      "frames": 264,
+      "done": 264,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg106\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg106\\mbg106_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T21:31:46.192299+00:00",
+      "movieKey": "mbg107",
+      "frames": 132,
+      "done": 132,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg107\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg107\\mbg107_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T21:58:39.032621+00:00",
+      "movieKey": "mbg108",
+      "frames": 227,
+      "done": 227,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg108\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg108\\mbg108_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T22:43:36.923427+00:00",
+      "movieKey": "mbg109",
+      "frames": 360,
+      "done": 360,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg109\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg109\\mbg109_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T23:08:12.447477+00:00",
+      "movieKey": "mbg110",
+      "frames": 195,
+      "done": 195,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg110\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg110\\mbg110_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T23:37:46.316795+00:00",
+      "movieKey": "mbg111",
+      "frames": 228,
+      "done": 228,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg111\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg111\\mbg111_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-01T23:52:08.930788+00:00",
+      "movieKey": "mbg112",
+      "frames": 120,
+      "done": 120,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg112\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg112\\mbg112_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T00:10:00.833929+00:00",
+      "movieKey": "mbg113",
+      "frames": 144,
+      "done": 144,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg113\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg113\\mbg113_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T00:21:16.602615+00:00",
+      "movieKey": "mbg114",
+      "frames": 90,
+      "done": 90,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg114\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg114\\mbg114_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T00:57:53.523598+00:00",
+      "movieKey": "mbg115",
+      "frames": 314,
+      "done": 314,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg115\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg115\\mbg115_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T03:27:08.594656+00:00",
+      "movieKey": "mbg116",
+      "frames": 1193,
+      "done": 1193,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg116\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg116\\mbg116_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T03:49:22.254381+00:00",
+      "movieKey": "mbg117",
+      "frames": 180,
+      "done": 180,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg117\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg117\\mbg117_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T04:15:56.638471+00:00",
+      "movieKey": "mbg118",
+      "frames": 225,
+      "done": 225,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg118\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg118\\mbg118_depth.bytes"
+    },
+    {
+      "status": "complete",
+      "updatedAt": "2026-06-02T04:23:22.259962+00:00",
+      "movieKey": "mbg119",
+      "frames": 64,
+      "done": 64,
+      "failed": 0,
+      "skipped": 0,
+      "spec": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg119\\spec.json",
+      "depthVideo": "C:\\Users\\rxcam\\Documents\\FFIX3DVR\\artifacts\\fmv-depth\\mbg119\\mbg119_depth.bytes"
+    }
+  ]
+}
