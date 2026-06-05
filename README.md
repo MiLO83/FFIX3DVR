@@ -10,7 +10,7 @@ The current public package is an alpha test. Field scenes, actors, shadows, dial
 
 Download the latest sanitized alpha from the GitHub releases page:
 
-- [FF9DepthVR 0.2.0 Open Beta 6 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.6)
+- [FF9DepthVR 0.2.0 Open Beta 7 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.7)
 
 The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
 
@@ -21,7 +21,7 @@ Requirements:
 - A legally owned Steam copy of Final Fantasy IX.
 - A current Memoria Engine install for the Steam version.
 - The latest `FF9DepthVR` release ZIP from GitHub.
-- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 6 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E` and the previous Open Beta 5 FF9DepthVR runtime hash.
+- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 7 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E` and the previous Open Beta 6 FF9DepthVR runtime hash.
 
 Install steps:
 
@@ -53,6 +53,7 @@ Troubleshooting:
 
 - If the mod does not appear, re-check that the folder is `FINAL FANTASY IX\FF9DepthVR\`, not `FINAL FANTASY IX\FF9DepthVR\FF9DepthVR\`.
 - If scenes fall back to flat/2D, the matching depth or metadata file is probably missing from `StreamingAssets\Data\FF9DepthVR`.
+- If only dialogue/UI split in SBS, reinstall Open Beta 7 or newer; it adds a fallback field stereo bridge for scenes that temporarily miss depth plate setup.
 - If FMVs play flat, the color movie still comes from your local game install, and 3D depth is used only when the matching generated depth stream is available.
 - If the runtime patcher says the DLL hash is unsupported, reinstall/update Memoria to the supported build or wait for a refreshed FF9DepthVR patch target.
 - If a new Memoria build changes loose-file loading behavior, reinstall the latest release package before debugging old files.
@@ -67,13 +68,14 @@ Troubleshooting:
 - Dialogue/menu duplication for SBS play.
 - Actor, shadow, and small field effect grounding fixes for camera perspective movement.
 - Actor-average camera look assist, enabled by default and toggleable with `F8`.
+- Fallback field SBS bridge for scenes/transitions where the depth plate is unavailable but UI, actors, and background still need to remain split.
 - `F7` VR Capture Mode for forcing SBS output for headset desktop/theater capture.
 - Optional localhost UDP head-tracking bridge on port `29710` using `yaw,pitch,roll` degree packets while VR Capture Mode is enabled.
 - `depth-gallery.html` for browsing depth scenes and comparing 2D/3D output in a browser.
 
 ## FMV Status
 
-The first generated FMV depth set is included as depth-only Theora `.bytes` streams. The package does not include original FMV color frames or movie files; color playback comes from the user's legally owned game install.
+The generated FMV depth batch is included as depth-only Theora `.bytes` streams. The package does not include original FMV color frames or movie files; color playback comes from the user's legally owned game install.
 
 Important FMV limitations in this alpha:
 
@@ -81,7 +83,7 @@ Important FMV limitations in this alpha:
 - Standalone FMV depth strength is intentionally softened for the alpha while the generated depth maps are tuned.
 - FMV field background plates are still being stabilized across every transition.
 - FMVs with actors or walkmesh interaction still need per-frame walkmesh projection against the generated depth.
-- Future FMV depth passes may be regenerated as the projection and stereo tuning improves.
+- FMV depth passes may still be regenerated as the projection and stereo tuning improves.
 
 ## Sanitized Repository
 
@@ -124,7 +126,7 @@ powershell -ExecutionPolicy Bypass -File tools\inspect_runtime_patch_compatibili
 
 ## Project Direction
 
-The short-term goal is a playable alpha with stable field and battle SBS support, then full FMV depth playback once the batch render completes. After that, the next major target is VR compatibility testing on real headset hardware.
+The short-term goal is a playable alpha with stable field, battle, and FMV SBS support. The generated FMV depth batch is now packaged, but FMV projection and field-FMV transitions still need more testing. The next major target is VR compatibility testing on real headset hardware.
 
 This is research-heavy modding work, not a finished release. Feedback, screenshots, bug reports, and scene-specific notes are welcome.
 

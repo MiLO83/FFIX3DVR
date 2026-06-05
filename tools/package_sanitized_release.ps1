@@ -92,6 +92,7 @@ To run the in-game mod, install Memoria, copy the FF9DepthVR folder into your ga
 then run runtime-patch\Install-FF9DepthVR.ps1 against your local FINAL FANTASY IX folder.
 "@ | Set-Content -Path (Join-Path $stage "README_SANITIZED_PACKAGE.txt") -Encoding UTF8
 
+Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $stage "README.md") -Force
 Copy-Directory (Join-Path $root "docs") (Join-Path $stage "docs") @() @()
 
 Copy-Directory (Join-Path $root "viewer") (Join-Path $stage "viewer") `

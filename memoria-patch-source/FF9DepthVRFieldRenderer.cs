@@ -34,6 +34,7 @@ namespace Memoria.FF9DepthVR
 
         private const String ManifestPath = "Data/FF9DepthVR/manifest.json";
         internal const String RootName = "FF9DepthVR_Background";
+        internal const String FallbackRootName = "FF9DepthVR_FallbackBridge";
         private const Single DepthUnitScale = 32f;
         internal const Int32 ReplacementPlateRenderQueue = 1500;
         internal const Single ViewAngleMultiplier = 3f;
@@ -59,6 +60,7 @@ namespace Memoria.FF9DepthVR
         private static Int32 _lastVrCaptureToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
         private static Int32 _lastStereoIpdAdjustFrame = -1;
+        private static Int32 _lastActorCameraScrollFrame = -1;
         private static Vector3 _lastInputLookMousePosition;
         private static Boolean _hasLastInputLookMousePosition;
         private static Boolean _controllerInputLookMode;
@@ -815,16 +817,19 @@ namespace Memoria.FF9DepthVR
         {
             if (fieldMap == null || fieldMap.scene == null || fieldMap.camIdx < 0 || fieldMap.camIdx >= fieldMap.scene.cameraList.Count)
                 return;
+            if (_lastActorCameraScrollFrame == Time.frameCount)
+                return;
 
             Camera camera = fieldMap.GetMainCamera();
             CameraFrameState frame = camera != null ? GetCameraFrame(camera) : null;
             EnsureManifestLoaded();
-            if (!PlateVisible || FindScene(fieldMap) == null)
+            if (!PlateVisible)
             {
                 if (frame != null)
                     ApplyCameraZoom(camera, frame, 1f);
                 return;
             }
+            _lastActorCameraScrollFrame = Time.frameCount;
 
             BGCAM_DEF bgCamera = fieldMap.scene.cameraList[fieldMap.camIdx];
             Vector3 averageProjected;
@@ -900,7 +905,7 @@ namespace Memoria.FF9DepthVR
                 return;
 
             CameraFrameState frame = GetCameraFrame(camera);
-            if (!PlateVisible || FindScene(fieldMap) == null)
+            if (!PlateVisible)
             {
                 frame.Offset = Vector2.Lerp(frame.Offset, Vector2.zero, Time.deltaTime * 4f);
                 ApplyCameraZoom(camera, frame, 1f);
@@ -1049,6 +1054,7 @@ namespace Memoria.FF9DepthVR
                 if (entry == null || !entry.Enabled)
                 {
                     DestroyExisting(fieldMap);
+                    EnsureFallbackFieldBridge(fieldMap);
                     SetOriginalBackgroundVisible(fieldMap, true);
                     return;
                 }
@@ -1058,23 +1064,29 @@ namespace Memoria.FF9DepthVR
                 if (colorTexture == null || depthTexture == null)
                 {
                     DestroyExisting(fieldMap);
+                    EnsureFallbackFieldBridge(fieldMap);
                     SetOriginalBackgroundVisible(fieldMap, true);
                     return;
                 }
 
                 ApplyAlphaCutoff(colorTexture, _defaults.AlphaCutoff);
                 DestroyExisting(fieldMap);
+                DestroyFallbackFieldBridge(fieldMap);
                 GameObject root = BuildDepthPlate(fieldMap, entry, colorTexture, depthTexture);
                 if (root != null)
                 {
                     SetOriginalBackgroundVisible(fieldMap, true);
                 }
                 else
+                {
+                    EnsureFallbackFieldBridge(fieldMap);
                     SetOriginalBackgroundVisible(fieldMap, true);
+                }
             }
             catch (Exception ex)
             {
                 DestroyExisting(fieldMap);
+                EnsureFallbackFieldBridge(fieldMap);
                 SetOriginalBackgroundVisible(fieldMap, true);
                 Log.Message("[FF9DepthVR] Field renderer failed: " + ex);
             }
@@ -1123,6 +1135,20 @@ namespace Memoria.FF9DepthVR
             SceneEntry entry;
             if (!String.IsNullOrEmpty(fieldMap.mapName) && ScenesByMapName.TryGetValue(fieldMap.mapName, out entry))
                 return entry;
+
+            try
+            {
+                Int32 fieldMapNo = global::FF9StateSystem.Common.FF9.fldMapNo;
+                String eventMapName;
+                if (global::EventEngineUtils.eventIDToFBGID.TryGetValue(fieldMapNo, out eventMapName)
+                    && !String.IsNullOrEmpty(eventMapName)
+                    && ScenesByMapName.TryGetValue(eventMapName, out entry))
+                    return entry;
+            }
+            catch
+            {
+                // Some early scene transitions do not have the event engine fully populated yet.
+            }
 
             String stateMapName = global::FF9StateSystem.Common.FF9.mapNameStr;
             if (!String.IsNullOrEmpty(stateMapName) && ScenesByMapName.TryGetValue(stateMapName, out entry))
@@ -1367,6 +1393,39 @@ namespace Memoria.FF9DepthVR
         private static void DestroyExisting(global::FieldMap fieldMap)
         {
             Transform existing = FindChildRecursive(fieldMap.transform, RootName);
+            if (existing == null)
+                return;
+
+            if (Application.isPlaying)
+                UnityEngine.Object.Destroy(existing.gameObject);
+            else
+                UnityEngine.Object.DestroyImmediate(existing.gameObject);
+        }
+
+        private static void EnsureFallbackFieldBridge(global::FieldMap fieldMap)
+        {
+            if (fieldMap == null || fieldMap.transform == null)
+                return;
+
+            Transform existing = FindChildRecursive(fieldMap.transform, FallbackRootName);
+            GameObject root = existing != null ? existing.gameObject : new GameObject(FallbackRootName);
+            root.transform.SetParent(fieldMap.transform, false);
+            root.transform.localPosition = Vector3.zero;
+            root.transform.localRotation = Quaternion.identity;
+            root.transform.localScale = Vector3.one;
+
+            FF9DepthVRFallbackFieldBridge bridge = root.GetComponent<FF9DepthVRFallbackFieldBridge>();
+            if (bridge == null)
+                bridge = root.AddComponent<FF9DepthVRFallbackFieldBridge>();
+            bridge.Initialize(fieldMap);
+        }
+
+        private static void DestroyFallbackFieldBridge(global::FieldMap fieldMap)
+        {
+            if (fieldMap == null || fieldMap.transform == null)
+                return;
+
+            Transform existing = FindChildRecursive(fieldMap.transform, FallbackRootName);
             if (existing == null)
                 return;
 
@@ -3349,6 +3408,54 @@ namespace Memoria.FF9DepthVR
         }
     }
 
+    public sealed class FF9DepthVRFallbackFieldBridge : MonoBehaviour
+    {
+        private global::FieldMap _fieldMap;
+        private FF9DepthVRSbsStereo _sbsStereo;
+        private FF9DepthVRSbsUiStereo _sbsUiStereo;
+        private GUIStyle _statusStyle;
+
+        public void Initialize(global::FieldMap fieldMap)
+        {
+            _fieldMap = fieldMap;
+
+            if (_sbsStereo == null)
+            {
+                _sbsStereo = gameObject.GetComponent<FF9DepthVRSbsStereo>();
+                if (_sbsStereo == null)
+                    _sbsStereo = gameObject.AddComponent<FF9DepthVRSbsStereo>();
+            }
+            _sbsStereo.Initialize(fieldMap, true);
+
+            if (_sbsUiStereo == null)
+            {
+                _sbsUiStereo = gameObject.GetComponent<FF9DepthVRSbsUiStereo>();
+                if (_sbsUiStereo == null)
+                    _sbsUiStereo = gameObject.AddComponent<FF9DepthVRSbsUiStereo>();
+            }
+            _sbsUiStereo.Initialize();
+        }
+
+        private void Update()
+        {
+            FF9DepthVRFieldRenderer.TryHandleSbsToggleInput();
+            FF9DepthVRFieldRenderer.ApplyActorCameraScroll(_fieldMap);
+        }
+
+        private void OnGUI()
+        {
+            if (_statusStyle == null)
+            {
+                _statusStyle = new GUIStyle(GUI.skin.box);
+                _statusStyle.alignment = TextAnchor.MiddleLeft;
+                _statusStyle.fontSize = 14;
+                _statusStyle.normal.textColor = Color.white;
+            }
+
+            GUI.Box(new Rect(8f, 8f, Mathf.Min(620f, Screen.width - 16f), 26f), FF9DepthVRFieldRenderer.ModeStatusText, _statusStyle);
+        }
+    }
+
     public sealed class FF9DepthVRSbsStereo : MonoBehaviour
     {
         private global::FieldMap _fieldMap;
@@ -3361,10 +3468,17 @@ namespace Memoria.FF9DepthVR
         private Vector3 _baseScale = Vector3.one;
         private Boolean _hasBasePose;
         private Boolean _wasEnabled;
+        private Boolean _applyFallbackInputLook;
 
         public void Initialize(global::FieldMap fieldMap)
         {
+            Initialize(fieldMap, false);
+        }
+
+        public void Initialize(global::FieldMap fieldMap, Boolean applyFallbackInputLook)
+        {
             _fieldMap = fieldMap;
+            _applyFallbackInputLook = applyFallbackInputLook;
             _mainCamera = fieldMap != null ? fieldMap.GetMainCamera() : null;
             if (_mainCamera != null)
             {
@@ -3443,6 +3557,15 @@ namespace Memoria.FF9DepthVR
             _baseScale = _mainCamera.transform.localScale;
             _hasBasePose = true;
 
+            Quaternion viewRotation = _baseRotation;
+            if (_applyFallbackInputLook)
+            {
+                Vector2 look = FF9DepthVRFieldRenderer.InputLookNormalized(true);
+                Single xMultiplier = FF9DepthVRFieldRenderer.SbsActive ? FF9DepthVRFieldRenderer.ViewAngleXMultiplier : 1f;
+                Quaternion lookRotation = Quaternion.Euler(-look.y * FF9DepthVRFieldRenderer.ViewAngleMultiplier, look.x * FF9DepthVRFieldRenderer.ViewAngleMultiplier * xMultiplier, 0f);
+                viewRotation = _baseRotation * lookRotation;
+            }
+
             Single aspect = SbsEyeAspect();
             _mainCamera.pixelRect = new Rect(0f, 0f, Screen.width * 0.5f, Screen.height);
             _mainCamera.aspect = aspect;
@@ -3457,17 +3580,17 @@ namespace Memoria.FF9DepthVR
             {
                 // Keep both eyes on the mono field camera by default; this preserves the stable actor/mask grounding.
                 _mainCamera.transform.position = _basePosition;
-                _mainCamera.transform.rotation = _baseRotation;
+                _mainCamera.transform.rotation = viewRotation;
                 _mainCamera.transform.localScale = _baseScale;
                 _rightCamera.transform.position = _basePosition;
-                _rightCamera.transform.rotation = _baseRotation;
+                _rightCamera.transform.rotation = viewRotation;
                 _rightCamera.transform.localScale = _baseScale;
             }
             else
             {
-                Vector3 right = _baseRotation * Vector3.right;
-                Vector3 up = _baseRotation * Vector3.up;
-                Vector3 target = _basePosition + _baseRotation * Vector3.forward * 1000f;
+                Vector3 right = viewRotation * Vector3.right;
+                Vector3 up = viewRotation * Vector3.up;
+                Vector3 target = _basePosition + viewRotation * Vector3.forward * 1000f;
                 Vector3 leftEye = _basePosition - right * eyeOffset;
                 Vector3 rightEye = _basePosition + right * eyeOffset;
                 _mainCamera.transform.position = leftEye;
