@@ -21,6 +21,7 @@ function Assert-Contains([string]$needle, [string]$message) {
 Assert-Contains "DepthMoviePath" "FMV depth resolver must expose a depth .bytes path."
 Assert-Contains "_depth.bytes" "FMV depth resolver must search for generated *_depth.bytes files."
 Assert-Contains "FF9DepthVRTheoraDepthStream" "FMV BGPlate must include a Theora depth stream reader."
+Assert-Contains "FlipDecodedReadbackVertical(_readableDepth)" "FMV depth .bytes readback must be vertically flipped at decode time to match the native flipped movie material."
 Assert-Contains "TryLoadDepthMovieFrame" "FMV BGPlate must prefer the depth .bytes frame path."
 Assert-Contains "_movieMaterial.Material" "FMV BGPlate must reuse the native color MovieMaterial instead of requiring color PNG frames."
 Assert-Contains "missing depth movie bytes or depth_frames directory" "Fallback reason should allow either depth .bytes or frame directories."

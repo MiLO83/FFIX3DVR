@@ -10,7 +10,7 @@ The current public package is an alpha test. Field scenes, actors, shadows, dial
 
 Download the latest sanitized alpha from the GitHub releases page:
 
-- [FF9DepthVR 0.2.0 Open Beta 5 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.5)
+- [FF9DepthVR 0.2.0 Open Beta 6 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.6)
 
 The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
 
@@ -21,7 +21,7 @@ Requirements:
 - A legally owned Steam copy of Final Fantasy IX.
 - A current Memoria Engine install for the Steam version.
 - The latest `FF9DepthVR` release ZIP from GitHub.
-- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 5 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E` and the previous FF9DepthVR alpha runtime hash.
+- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 6 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E` and the previous Open Beta 5 FF9DepthVR runtime hash.
 
 Install steps:
 
@@ -31,7 +31,7 @@ Install steps:
 4. Copy the extracted `FF9DepthVR` mod folder into your Final Fantasy IX game folder, next to the existing game folders/files.
 5. Confirm this path exists after copying: `FINAL FANTASY IX\FF9DepthVR\ModDescription.xml`.
 6. Confirm the depth assets are present at `FINAL FANTASY IX\FF9DepthVR\StreamingAssets\Data\FF9DepthVR\`.
-7. Install the runtime patch against your local Memoria DLL:
+7. Install the runtime patch against your local Memoria DLL. The IPS patch files are included in the release ZIP under `runtime-patch\`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\runtime-patch\Install-FF9DepthVR.ps1 -GamePath "C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY IX"
@@ -47,6 +47,7 @@ Controls and test toggles:
 - `F8` toggles actor-average look assist. It now defaults on; mouse/right-stick/head tracking input remains additive.
 - `F7` toggles VR Capture Mode for headset desktop/theater capture.
 - `F6` is no longer used; depth masks stay enabled.
+- `+` and `-` adjust stereo IPD for the current gameplay context. Field, FMV field, standalone FMV, and battle modes keep separate IPD values.
 
 Troubleshooting:
 

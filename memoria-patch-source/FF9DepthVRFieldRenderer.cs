@@ -24,12 +24,28 @@ namespace Memoria.FF9DepthVR
             Compare = 2
         }
 
+        internal enum StereoIpdProfile
+        {
+            Field = 0,
+            FieldMovie = 1,
+            StandaloneMovie = 2,
+            Battle = 3
+        }
+
         private const String ManifestPath = "Data/FF9DepthVR/manifest.json";
         internal const String RootName = "FF9DepthVR_Background";
         private const Single DepthUnitScale = 32f;
         internal const Int32 ReplacementPlateRenderQueue = 1500;
         internal const Single ViewAngleMultiplier = 3f;
         internal const Single ViewAngleXMultiplier = 2f;
+        private const Single DefaultFieldStereoIpd = 0f;
+        private const Single DefaultFieldMovieStereoIpd = 0f;
+        private const Single DefaultStandaloneMovieStereoIpd = 0.045f;
+        private const Single DefaultBattleStereoIpd = 80f;
+        private const Single FieldStereoIpdStep = 0.01f;
+        private const Single FieldMovieStereoIpdStep = 0.01f;
+        private const Single StandaloneMovieStereoIpdStep = 0.005f;
+        private const Single BattleStereoIpdStep = 10f;
 
         private static readonly Dictionary<String, SceneEntry> ScenesByMapName = new Dictionary<String, SceneEntry>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<Material, Int32> OriginalBackgroundQueues = new Dictionary<Material, Int32>();
@@ -42,6 +58,7 @@ namespace Memoria.FF9DepthVR
         private static Int32 _lastActorLookToggleFrame = -1;
         private static Int32 _lastVrCaptureToggleFrame = -1;
         private static Int32 _lastMovieDebugToggleFrame = -1;
+        private static Int32 _lastStereoIpdAdjustFrame = -1;
         private static Vector3 _lastInputLookMousePosition;
         private static Boolean _hasLastInputLookMousePosition;
         private static Boolean _controllerInputLookMode;
@@ -49,6 +66,10 @@ namespace Memoria.FF9DepthVR
         private static FF9DepthVRMovieBgPlate _activeMoviePlate;
         private static global::FieldMap _activeMovieFieldMap;
         private static FF9DepthVRNativeMoviePlaneSbsScaler _activeNativeMoviePlaneScaler;
+        private static Single _fieldStereoIpd = DefaultFieldStereoIpd;
+        private static Single _fieldMovieStereoIpd = DefaultFieldMovieStereoIpd;
+        private static Single _standaloneMovieStereoIpd = DefaultStandaloneMovieStereoIpd;
+        private static Single _battleStereoIpd = DefaultBattleStereoIpd;
         internal static Boolean PlateVisible = true;
         public static DepthViewMode ViewMode = DepthViewMode.Depth;
         public static Boolean SbsEnabled = false;
@@ -66,7 +87,8 @@ namespace Memoria.FF9DepthVR
             {
                 String view = VrCaptureEnabled ? "VR" : ViewMode.ToString();
                 String look = ActorLookEnabled ? "Actor+input look" : "Input look";
-                return "FF9DepthVR | View: " + view + " | Depth masks | " + look + " (F8)" + (IsMbgPlaybackActive() ? " | MBG" : String.Empty);
+                StereoIpdProfile profile = GetCurrentFieldStereoIpdProfile();
+                return "FF9DepthVR | View: " + view + " | Depth masks | " + look + " (F8) | IPD " + StereoIpdProfileLabel(profile) + " " + GetStereoIpd(profile).ToString("0.###", CultureInfo.InvariantCulture) + " (+/-)" + (IsMbgPlaybackActive() ? " | MBG" : String.Empty);
             }
         }
         internal static Boolean IsMbgPlaybackActive()
@@ -129,6 +151,85 @@ namespace Memoria.FF9DepthVR
         private static void ApplySbsState()
         {
             SbsEnabled = VrCaptureEnabled || ViewMode != DepthViewMode.Depth;
+        }
+
+        internal static StereoIpdProfile GetCurrentFieldStereoIpdProfile()
+        {
+            return IsMbgPlaybackActive() ? StereoIpdProfile.FieldMovie : StereoIpdProfile.Field;
+        }
+
+        internal static Single GetStereoIpd(StereoIpdProfile profile)
+        {
+            switch (profile)
+            {
+                case StereoIpdProfile.FieldMovie:
+                    return _fieldMovieStereoIpd;
+                case StereoIpdProfile.StandaloneMovie:
+                    return _standaloneMovieStereoIpd;
+                case StereoIpdProfile.Battle:
+                    return _battleStereoIpd;
+                default:
+                    return _fieldStereoIpd;
+            }
+        }
+
+        internal static Single GetStereoEyeOffset(StereoIpdProfile profile)
+        {
+            return GetStereoIpd(profile) * 0.5f;
+        }
+
+        internal static Boolean TryHandleStereoIpdInput(StereoIpdProfile profile)
+        {
+            if (_lastStereoIpdAdjustFrame == Time.frameCount)
+                return false;
+
+            Single direction = 0f;
+            if (Input.GetKeyDown(KeyCode.KeypadPlus) || Input.GetKeyDown(KeyCode.Equals))
+                direction = 1f;
+            else if (Input.GetKeyDown(KeyCode.KeypadMinus) || Input.GetKeyDown(KeyCode.Minus))
+                direction = -1f;
+
+            if (Mathf.Abs(direction) <= Single.Epsilon)
+                return false;
+
+            _lastStereoIpdAdjustFrame = Time.frameCount;
+            Single value = AdjustStereoIpd(profile, direction);
+            Log.Message("[FF9DepthVR] IPD " + StereoIpdProfileLabel(profile) + " = " + value.ToString("0.###", CultureInfo.InvariantCulture) + " (+/-)");
+            return true;
+        }
+
+        private static Single AdjustStereoIpd(StereoIpdProfile profile, Single direction)
+        {
+            switch (profile)
+            {
+                case StereoIpdProfile.FieldMovie:
+                    _fieldMovieStereoIpd = Mathf.Clamp(_fieldMovieStereoIpd + direction * FieldMovieStereoIpdStep, 0f, 0.25f);
+                    return _fieldMovieStereoIpd;
+                case StereoIpdProfile.StandaloneMovie:
+                    _standaloneMovieStereoIpd = Mathf.Clamp(_standaloneMovieStereoIpd + direction * StandaloneMovieStereoIpdStep, 0f, 0.25f);
+                    return _standaloneMovieStereoIpd;
+                case StereoIpdProfile.Battle:
+                    _battleStereoIpd = Mathf.Clamp(_battleStereoIpd + direction * BattleStereoIpdStep, 0f, 300f);
+                    return _battleStereoIpd;
+                default:
+                    _fieldStereoIpd = Mathf.Clamp(_fieldStereoIpd + direction * FieldStereoIpdStep, 0f, 0.25f);
+                    return _fieldStereoIpd;
+            }
+        }
+
+        private static String StereoIpdProfileLabel(StereoIpdProfile profile)
+        {
+            switch (profile)
+            {
+                case StereoIpdProfile.FieldMovie:
+                    return "Field-FMV";
+                case StereoIpdProfile.StandaloneMovie:
+                    return "FMV";
+                case StereoIpdProfile.Battle:
+                    return "Battle";
+                default:
+                    return "Field";
+            }
         }
 
         internal static Boolean TryReadHeadTrackLook(out Vector2 look)
@@ -3255,6 +3356,10 @@ namespace Memoria.FF9DepthVR
         private Camera _rightCamera;
         private Rect _mainRect = new Rect(0f, 0f, 1f, 1f);
         private Single _mainAspect = 1f;
+        private Vector3 _basePosition;
+        private Quaternion _baseRotation;
+        private Vector3 _baseScale = Vector3.one;
+        private Boolean _hasBasePose;
         private Boolean _wasEnabled;
 
         public void Initialize(global::FieldMap fieldMap)
@@ -3271,6 +3376,7 @@ namespace Memoria.FF9DepthVR
 
         private void LateUpdate()
         {
+            FF9DepthVRFieldRenderer.TryHandleStereoIpdInput(FF9DepthVRFieldRenderer.GetCurrentFieldStereoIpdProfile());
             if (_mainCamera == null && _fieldMap != null)
                 _mainCamera = _fieldMap.GetMainCamera();
             ApplyState(false);
@@ -3325,6 +3431,18 @@ namespace Memoria.FF9DepthVR
             if (_rightCamera == null || _mainCamera == null)
                 return;
 
+            if (_wasEnabled && _hasBasePose)
+            {
+                _mainCamera.transform.position = _basePosition;
+                _mainCamera.transform.rotation = _baseRotation;
+                _mainCamera.transform.localScale = _baseScale;
+            }
+
+            _basePosition = _mainCamera.transform.position;
+            _baseRotation = _mainCamera.transform.rotation;
+            _baseScale = _mainCamera.transform.localScale;
+            _hasBasePose = true;
+
             Single aspect = SbsEyeAspect();
             _mainCamera.pixelRect = new Rect(0f, 0f, Screen.width * 0.5f, Screen.height);
             _mainCamera.aspect = aspect;
@@ -3334,10 +3452,31 @@ namespace Memoria.FF9DepthVR
             _rightCamera.depth = _mainCamera.depth + 0.01f;
             _rightCamera.enabled = true;
 
-            // Keep both eyes on the mono field camera until mask/UI projection is split per eye.
-            // A physical right-eye offset exposes unmatted depth holes in the original field art.
-            _rightCamera.transform.position = _mainCamera.transform.position;
-            _rightCamera.transform.rotation = _mainCamera.transform.rotation;
+            Single eyeOffset = FF9DepthVRFieldRenderer.GetStereoEyeOffset(FF9DepthVRFieldRenderer.GetCurrentFieldStereoIpdProfile());
+            if (eyeOffset <= 0.0001f)
+            {
+                // Keep both eyes on the mono field camera by default; this preserves the stable actor/mask grounding.
+                _mainCamera.transform.position = _basePosition;
+                _mainCamera.transform.rotation = _baseRotation;
+                _mainCamera.transform.localScale = _baseScale;
+                _rightCamera.transform.position = _basePosition;
+                _rightCamera.transform.rotation = _baseRotation;
+                _rightCamera.transform.localScale = _baseScale;
+            }
+            else
+            {
+                Vector3 right = _baseRotation * Vector3.right;
+                Vector3 up = _baseRotation * Vector3.up;
+                Vector3 target = _basePosition + _baseRotation * Vector3.forward * 1000f;
+                Vector3 leftEye = _basePosition - right * eyeOffset;
+                Vector3 rightEye = _basePosition + right * eyeOffset;
+                _mainCamera.transform.position = leftEye;
+                _mainCamera.transform.rotation = Quaternion.LookRotation((target - leftEye).normalized, up);
+                _mainCamera.transform.localScale = _baseScale;
+                _rightCamera.transform.position = rightEye;
+                _rightCamera.transform.rotation = Quaternion.LookRotation((target - rightEye).normalized, up);
+                _rightCamera.transform.localScale = _baseScale;
+            }
             SyncCompareCullers();
         }
 
@@ -3353,6 +3492,12 @@ namespace Memoria.FF9DepthVR
             DisableCompareCull(_mainCamera);
             if (_mainCamera != null)
             {
+                if (_wasEnabled && _hasBasePose)
+                {
+                    _mainCamera.transform.position = _basePosition;
+                    _mainCamera.transform.rotation = _baseRotation;
+                    _mainCamera.transform.localScale = _baseScale;
+                }
                 _mainCamera.rect = _mainRect;
                 _mainCamera.aspect = _mainAspect;
             }
@@ -3398,7 +3543,6 @@ namespace Memoria.FF9DepthVR
 
     public sealed class FF9DepthVRBattleStereo : MonoBehaviour
     {
-        private const Single EyeSeparation = 80f;
         private const Single ConvergenceDistance = 4000f;
 
         private static readonly Dictionary<Camera, FF9DepthVRBattleStereo> Instances = new Dictionary<Camera, FF9DepthVRBattleStereo>();
@@ -3451,6 +3595,7 @@ namespace Memoria.FF9DepthVR
         {
             FF9DepthVRFieldRenderer.TryHandleSbsToggleInput();
             FF9DepthVRFieldRenderer.TryHandleMovieDebugOverlayInput();
+            FF9DepthVRFieldRenderer.TryHandleStereoIpdInput(FF9DepthVRFieldRenderer.StereoIpdProfile.Battle);
         }
 
         private void LateUpdate()
@@ -3538,8 +3683,9 @@ namespace Memoria.FF9DepthVR
             target += (forward - baseForward) * targetDistance;
             Vector3 right = battleRotation * Vector3.right;
             Vector3 up = battleRotation * Vector3.up;
-            Vector3 leftEye = _basePosition - right * (EyeSeparation * 0.5f);
-            Vector3 rightEye = _basePosition + right * (EyeSeparation * 0.5f);
+            Single eyeOffset = FF9DepthVRFieldRenderer.GetStereoEyeOffset(FF9DepthVRFieldRenderer.StereoIpdProfile.Battle);
+            Vector3 leftEye = _basePosition - right * eyeOffset;
+            Vector3 rightEye = _basePosition + right * eyeOffset;
 
             _mainCamera.rect = new Rect(0f, 0f, 0.5f, 1f);
             _mainCamera.aspect = _mainAspect;
@@ -3687,8 +3833,6 @@ namespace Memoria.FF9DepthVR
 
     public sealed class FF9DepthVRMovieSbsStereo : MonoBehaviour
     {
-        private const Single EyeSeparation = 0.045f;
-
         private static readonly Dictionary<Camera, FF9DepthVRMovieSbsStereo> Instances = new Dictionary<Camera, FF9DepthVRMovieSbsStereo>();
 
         private Camera _mainCamera;
@@ -3794,6 +3938,7 @@ namespace Memoria.FF9DepthVR
         {
             FF9DepthVRFieldRenderer.TryHandleSbsToggleInput();
             FF9DepthVRFieldRenderer.TryHandleMovieDebugOverlayInput();
+            FF9DepthVRFieldRenderer.TryHandleStereoIpdInput(FF9DepthVRFieldRenderer.StereoIpdProfile.StandaloneMovie);
         }
 
         private void LateUpdate()
@@ -3893,8 +4038,9 @@ namespace Memoria.FF9DepthVR
             Vector3 right = _baseRotation * Vector3.right;
             Vector3 up = _baseRotation * Vector3.up;
             Vector3 target = _basePosition + _baseRotation * Vector3.forward * FF9DepthVRFieldRenderer.MoviePlateDistance;
-            Vector3 leftEye = _basePosition - right * (EyeSeparation * 0.5f);
-            Vector3 rightEye = _basePosition + right * (EyeSeparation * 0.5f);
+            Single eyeOffset = FF9DepthVRFieldRenderer.GetStereoEyeOffset(FF9DepthVRFieldRenderer.StereoIpdProfile.StandaloneMovie);
+            Vector3 leftEye = _basePosition - right * eyeOffset;
+            Vector3 rightEye = _basePosition + right * eyeOffset;
 
             _mainCamera.enabled = false;
 
@@ -4215,6 +4361,7 @@ namespace Memoria.FF9DepthVR
             _readableDepth.ReadPixels(new Rect(0f, 0f, ReadbackWidth, ReadbackHeight), 0, 0, false);
             _readableDepth.Apply(false, false);
             RenderTexture.active = previous;
+            FlipDecodedReadbackVertical(_readableDepth);
             NormalizeAlphaDepthIfNeeded(_readableDepth);
 
             if (!_loggedFirstFrame)
@@ -4258,6 +4405,27 @@ namespace Memoria.FF9DepthVR
                 _readbackTarget.filterMode = FilterMode.Bilinear;
                 _readbackTarget.Create();
             }
+        }
+
+        private static void FlipDecodedReadbackVertical(Texture2D texture)
+        {
+            if (texture == null || texture.width <= 0 || texture.height <= 1)
+                return;
+
+            Color32[] pixels = texture.GetPixels32();
+            Int32 width = texture.width;
+            Int32 halfHeight = texture.height / 2;
+            Color32[] row = new Color32[width];
+            for (Int32 y = 0; y < halfHeight; y++)
+            {
+                Int32 top = y * width;
+                Int32 bottom = (texture.height - 1 - y) * width;
+                Array.Copy(pixels, top, row, 0, width);
+                Array.Copy(pixels, bottom, pixels, top, width);
+                Array.Copy(row, 0, pixels, bottom, width);
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
         }
 
         private static void NormalizeAlphaDepthIfNeeded(Texture2D texture)
