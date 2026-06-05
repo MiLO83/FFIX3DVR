@@ -1059,19 +1059,32 @@ namespace Memoria.FF9DepthVR
                     return;
                 }
 
-                Texture2D colorTexture = global::AssetManager.Load<Texture2D>(entry.SourcePlate, true);
                 Texture2D depthTexture = global::AssetManager.Load<Texture2D>(entry.Depth, true);
-                if (colorTexture == null || depthTexture == null)
+                if (depthTexture == null)
                 {
                     DestroyExisting(fieldMap);
                     EnsureFallbackFieldBridge(fieldMap);
                     SetOriginalBackgroundVisible(fieldMap, true);
+                    Log.Message("[FF9DepthVR] Missing depth texture for " + entry.Id + " at " + entry.Depth + "; using original field renderer.");
                     return;
                 }
 
-                ApplyAlphaCutoff(colorTexture, _defaults.AlphaCutoff);
                 DestroyExisting(fieldMap);
                 DestroyFallbackFieldBridge(fieldMap);
+                Texture2D colorTexture = global::AssetManager.Load<Texture2D>(entry.SourcePlate, true);
+                if (colorTexture == null)
+                    colorTexture = CaptureOriginalBackgroundPlate(fieldMap, entry, depthTexture);
+                else
+                    ApplyAlphaCutoff(colorTexture, _defaults.AlphaCutoff);
+
+                if (colorTexture == null)
+                {
+                    EnsureFallbackFieldBridge(fieldMap);
+                    SetOriginalBackgroundVisible(fieldMap, true);
+                    Log.Message("[FF9DepthVR] Missing source plate for " + entry.Id + " at " + entry.SourcePlate + " and runtime capture failed; using original field renderer.");
+                    return;
+                }
+
                 GameObject root = BuildDepthPlate(fieldMap, entry, colorTexture, depthTexture);
                 if (root != null)
                 {
@@ -1155,6 +1168,151 @@ namespace Memoria.FF9DepthVR
                 return entry;
 
             return null;
+        }
+
+        private static Texture2D CaptureOriginalBackgroundPlate(global::FieldMap fieldMap, SceneEntry entry, Texture2D depthTexture)
+        {
+            if (fieldMap == null)
+                return null;
+
+            Camera camera = fieldMap.GetMainCamera();
+            Transform background = fieldMap.transform.Find("Background");
+            BGCAM_DEF bgCamera = fieldMap.scene != null && fieldMap.camIdx >= 0 && fieldMap.camIdx < fieldMap.scene.cameraList.Count
+                ? fieldMap.scene.cameraList[fieldMap.camIdx]
+                : null;
+            if (camera == null || background == null || bgCamera == null)
+                return null;
+
+            Single sourceScale = Mathf.Max(0.001f, _defaults.SourceScale);
+            Int32 width = Mathf.RoundToInt(bgCamera.w / sourceScale);
+            Int32 height = Mathf.RoundToInt(bgCamera.h / sourceScale);
+            if (width <= 0 || height <= 0 || width > 4096 || height > 4096)
+            {
+                width = depthTexture != null ? depthTexture.width : 0;
+                height = depthTexture != null ? depthTexture.height : 0;
+            }
+            if (width <= 0 || height <= 0 || width > 4096 || height > 4096)
+                return null;
+
+            RenderTexture target = null;
+            Texture2D captured = null;
+            RenderTexture previousActive = RenderTexture.active;
+            RenderTexture previousTarget = camera.targetTexture;
+            Rect previousRect = camera.rect;
+            CameraClearFlags previousClearFlags = camera.clearFlags;
+            Color previousBackgroundColor = camera.backgroundColor;
+            List<RendererState> hiddenRenderers = new List<RendererState>();
+
+            try
+            {
+                background.gameObject.SetActive(true);
+                RestoreOriginalBackgroundQueues(background);
+                SetBackgroundRenderersEnabled(background, true);
+                HideNonBackgroundFieldRenderers(fieldMap, background, hiddenRenderers);
+
+                target = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
+                camera.targetTexture = target;
+                camera.rect = new Rect(0f, 0f, 1f, 1f);
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.clear;
+                camera.Render();
+
+                RenderTexture.active = target;
+                captured = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                captured.name = "FF9DepthVR_RuntimeSource_" + entry.Id;
+                captured.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
+                captured.Apply(false, false);
+                captured.wrapMode = TextureWrapMode.Clamp;
+                captured.filterMode = FilterMode.Bilinear;
+                ApplyAlphaCutoff(captured, _defaults.AlphaCutoff);
+                Log.Message("[FF9DepthVR] Runtime source plate captured for " + entry.Id + " size=" + width + "x" + height + " sourceScale=" + sourceScale.ToString("F3"));
+                return captured;
+            }
+            catch (Exception ex)
+            {
+                if (captured != null)
+                    UnityEngine.Object.Destroy(captured);
+                Log.Message("[FF9DepthVR] Runtime source plate capture failed for " + entry.Id + ": " + ex.Message);
+                return null;
+            }
+            finally
+            {
+                for (Int32 i = 0; i < hiddenRenderers.Count; i++)
+                {
+                    RendererState state = hiddenRenderers[i];
+                    if (state.Renderer != null)
+                        state.Renderer.enabled = state.Enabled;
+                }
+                camera.targetTexture = previousTarget;
+                camera.rect = previousRect;
+                camera.clearFlags = previousClearFlags;
+                camera.backgroundColor = previousBackgroundColor;
+                RenderTexture.active = previousActive;
+                if (target != null)
+                    RenderTexture.ReleaseTemporary(target);
+            }
+        }
+
+        private static void HideNonBackgroundFieldRenderers(global::FieldMap fieldMap, Transform background, List<RendererState> hiddenRenderers)
+        {
+            if (fieldMap == null || background == null || hiddenRenderers == null)
+                return;
+
+            Renderer[] renderers = fieldMap.GetComponentsInChildren<Renderer>(true);
+            for (Int32 i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || renderer.transform == null || renderer.transform == background || renderer.transform.IsChildOf(background))
+                    continue;
+
+                hiddenRenderers.Add(new RendererState(renderer, renderer.enabled));
+                renderer.enabled = false;
+            }
+        }
+
+        private static void SetBackgroundRenderersEnabled(Transform background, Boolean enabled)
+        {
+            Renderer[] renderers = background.GetComponentsInChildren<Renderer>(true);
+            for (Int32 i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                    renderers[i].enabled = enabled;
+            }
+        }
+
+        private static void RestoreOriginalBackgroundQueues(Transform background)
+        {
+            if (background == null)
+                return;
+
+            Renderer[] renderers = background.GetComponentsInChildren<Renderer>(true);
+            for (Int32 r = 0; r < renderers.Length; r++)
+            {
+                Renderer renderer = renderers[r];
+                if (renderer == null)
+                    continue;
+
+                Material[] materials = renderer.materials;
+                for (Int32 m = 0; m < materials.Length; m++)
+                {
+                    Material material = materials[m];
+                    Int32 originalQueue;
+                    if (material != null && OriginalBackgroundQueues.TryGetValue(material, out originalQueue))
+                        material.renderQueue = originalQueue;
+                }
+            }
+        }
+
+        private struct RendererState
+        {
+            public readonly Renderer Renderer;
+            public readonly Boolean Enabled;
+
+            public RendererState(Renderer renderer, Boolean enabled)
+            {
+                Renderer = renderer;
+                Enabled = enabled;
+            }
         }
 
         private static GameObject BuildDepthPlate(global::FieldMap fieldMap, SceneEntry entry, Texture2D colorTexture, Texture2D depthTexture)

@@ -10,7 +10,7 @@ The current public package is an alpha test. Field scenes, actors, shadows, dial
 
 Download the latest sanitized alpha from the GitHub releases page:
 
-- [FF9DepthVR 0.2.0 Open Beta 7 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.7)
+- [FF9DepthVR 0.2.0 Open Beta 8 (stable alpha)](https://github.com/MiLO83/FFIX3DVR/releases/tag/v0.2.0-open-beta.8)
 
 The release is intended for testing and feedback. Expect rough edges, scene-specific bugs, and changes between builds.
 
@@ -21,7 +21,7 @@ Requirements:
 - A legally owned Steam copy of Final Fantasy IX.
 - A current Memoria Engine install for the Steam version.
 - The latest `FF9DepthVR` release ZIP from GitHub.
-- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 7 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E` and the previous Open Beta 6 FF9DepthVR runtime hash.
+- A Memoria `Assembly-CSharp.dll` matching one of the release patcher hashes. Open Beta 8 supports Memoria reference hash `2C175D936B8E1D42820DC347D9F491EB6D5B01870CF868ADB126A76D5649901E`, the previous FF9DepthVR alpha runtime hash, and the Open Beta 7 runtime hash. The Open Beta 8 patched runtime hash is `CC1D1A7A0DF6363BE013C9B62FC01B15800A40EE14292E82AD033B1BEB79D0A1`.
 
 Install steps:
 
@@ -53,7 +53,7 @@ Troubleshooting:
 
 - If the mod does not appear, re-check that the folder is `FINAL FANTASY IX\FF9DepthVR\`, not `FINAL FANTASY IX\FF9DepthVR\FF9DepthVR\`.
 - If scenes fall back to flat/2D, the matching depth or metadata file is probably missing from `StreamingAssets\Data\FF9DepthVR`.
-- If only dialogue/UI split in SBS, reinstall Open Beta 7 or newer; it adds a fallback field stereo bridge for scenes that temporarily miss depth plate setup.
+- If only dialogue/UI split in SBS, reinstall Open Beta 8 or newer; it can capture the runtime field color plate from your local game install when sanitized source plates are not packaged.
 - If FMVs play flat, the color movie still comes from your local game install, and 3D depth is used only when the matching generated depth stream is available.
 - If the runtime patcher says the DLL hash is unsupported, reinstall/update Memoria to the supported build or wait for a refreshed FF9DepthVR patch target.
 - If a new Memoria build changes loose-file loading behavior, reinstall the latest release package before debugging old files.
